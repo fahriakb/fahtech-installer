@@ -82,7 +82,6 @@ install_dhcp() {
         IFS='|' read -r SELECTED_IFACE SELECTED_IP <<< "${INTERFACES[$((choice-1))]}"
         echo -e "${GREEN}✅ Terpilih: $SELECTED_IFACE (IP: $SELECTED_IP)${NC}"
         
-        # Ambil subnet otomatis dari IP yang dipilih
         SUBNET=$(echo $SELECTED_IP | cut -d. -f1-3).0
         GATEWAY=$(echo $SELECTED_IP | cut -d. -f1-3).1
         RANGE_START=$(echo $SELECTED_IP | cut -d. -f1-3).100
@@ -213,13 +212,12 @@ EOF
 }
 
 # ============================================================
-# 3. INSTALL APACHE2 + LANDING PAGE FAHTECH
+# 3. INSTALL APACHE2
 # ============================================================
 install_apache2() {
     clear
     echo -e "${GREEN}╔════════════════════════════════════════════════╗${NC}"
     echo -e "${GREEN}║         🌍 INSTALL APACHE2                      ║${NC}"
-    echo -e "${GREEN}║         + Landing Page FahTech                 ║${NC}"
     echo -e "${GREEN}╚════════════════════════════════════════════════╝${NC}"
     
     apt update -qq
@@ -227,61 +225,21 @@ install_apache2() {
     
     SERVER_IP=$(hostname -I | awk '{print $1}')
     
-    cat > /var/www/html/index.html <<'EOF'
+    cat > /var/www/html/index.html <<EOF
 <!DOCTYPE html>
 <html>
-<head>
-    <title>FahTech - Server Professional</title>
-    <meta charset="UTF-8">
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            font-family: 'Segoe UI', Arial, sans-serif;
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-        .card {
-            background: white;
-            border-radius: 20px;
-            padding: 50px;
-            max-width: 900px;
-            text-align: center;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-        }
-        h1 { color: #667eea; font-size: 52px; margin-bottom: 10px; }
-        .tagline { color: #764ba2; font-size: 18px; margin-bottom: 30px; }
-        .status { background: #4CAF50; color: white; padding: 12px; border-radius: 10px; margin: 20px 0; font-size: 18px; }
-        .ip-box { background: #1a1a2e; color: #0f0; padding: 15px; border-radius: 10px; font-family: monospace; margin: 20px 0; font-size: 18px; }
-        .services { display: grid; grid-template-columns: repeat(4,1fr); gap: 15px; margin: 30px 0; }
-        .service { background: #f8f9fa; padding: 15px; border-radius: 10px; transition: transform 0.3s; }
-        .service:hover { transform: translateY(-5px); background: #e9ecef; cursor: pointer; }
-        .icon { font-size: 40px; display: block; margin-bottom: 10px; }
-        .footer { margin-top: 30px; color: #999; font-size: 12px; }
-        @media (max-width: 600px) { .services { grid-template-columns: repeat(2,1fr); } .card { padding: 30px; } h1 { font-size: 36px; } }
-    </style>
+<head><title>FahTech Server</title>
+<style>
+body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); font-family: Arial; text-align: center; padding: 50px; }
+h1 { color: white; font-size: 48px; }
+.status { background: #4CAF50; padding: 10px; border-radius: 10px; color: white; }
+</style>
 </head>
 <body>
-    <div class="card">
-        <h1>⚡ FAHTECH ⚡</h1>
-        <div class="tagline">Professional Server Solutions</div>
-        <div class="status">🟢 ALL SYSTEMS OPERATIONAL</div>
-        <div class="ip-box">🌐 SERVER IP: <?php echo $_SERVER['SERVER_ADDR']; ?></div>
-        <h2>Available Services</h2>
-        <div class="services">
-            <div class="service"><span class="icon">🌐</span><br>Apache2</div>
-            <div class="service"><span class="icon">📁</span><br>FTP</div>
-            <div class="service"><span class="icon">🔍</span><br>DNS</div>
-            <div class="service"><span class="icon">💾</span><br>Samba</div>
-            <div class="service"><span class="icon">📧</span><br>Mail</div>
-            <div class="service"><span class="icon">📝</span><br>WordPress</div>
-            <div class="service"><span class="icon">🗄️</span><br>CRUD</div>
-            <div class="service"><span class="icon">⚙️</span><br>Auto Install</div>
-        </div>
-        <div class="footer">Powered by FahTech Auto Installer v4.0 | &copy; 2026</div>
-    </div>
+<h1>⚡ FAHTECH SERVER ⚡</h1>
+<div class="status">✅ SERVER BERJALAN DENGAN BAIK</div>
+<p style="color:white;">Server IP: <?php echo \$_SERVER['SERVER_ADDR']; ?></p>
+<p style="color:white;">Powered by FahTech Auto Installer</p>
 </body>
 </html>
 EOF
@@ -290,6 +248,7 @@ EOF
     
     echo -e "\n${GREEN}✅ APACHE2 BERHASIL!${NC}"
     echo -e "   Akses: http://$SERVER_IP"
+    
     echo -e "\n${YELLOW}Tekan Enter untuk kembali...${NC}"
     read
 }
@@ -311,8 +270,6 @@ install_ftp() {
     
     echo -e "\n${GREEN}✅ FTP BERHASIL!${NC}"
     echo -e "   Server: $SERVER_IP"
-    echo -e "   Port: 21"
-    echo -e "\n${YELLOW}📝 Tambah user FTP: useradd -m nama && passwd nama${NC}"
     
     echo -e "\n${YELLOW}Tekan Enter untuk kembali...${NC}"
     read
@@ -369,7 +326,7 @@ install_mail() {
     echo -e "${GREEN}║         📧 INSTALL MAIL SERVER                 ║${NC}"
     echo -e "${GREEN}╚════════════════════════════════════════════════╝${NC}"
     
-    echo -n "📝 Domain untuk email (contoh: mail.fahtech.com): "
+    echo -n "📝 Domain untuk email: "
     read mail_domain
     
     debconf-set-selections <<EOF
@@ -383,7 +340,6 @@ EOF
     systemctl enable postfix dovecot
     
     echo -e "\n${GREEN}✅ MAIL SERVER BERHASIL!${NC}"
-    echo -e "   Domain: $mail_domain"
     
     echo -e "\n${YELLOW}Tekan Enter untuk kembali...${NC}"
     read
@@ -396,7 +352,6 @@ install_wordpress() {
     clear
     echo -e "${GREEN}╔════════════════════════════════════════════════╗${NC}"
     echo -e "${GREEN}║         📝 INSTALL WORDPRESS                   ║${NC}"
-    echo -e "${GREEN}║         + Database Auto Setup                 ║${NC}"
     echo -e "${GREEN}╚════════════════════════════════════════════════╝${NC}"
     
     apt install mariadb-server php php-mysql php-curl php-gd php-xml php-mbstring php-zip unzip wget -y -qq
@@ -429,7 +384,6 @@ MYSQL_SCRIPT
     
     echo -e "\n${GREEN}✅ WORDPRESS BERHASIL!${NC}"
     echo -e "   🔗 Akses: http://$SERVER_IP/wp-admin/install.php"
-    echo -e "   📊 DB User: wpuser"
     echo -e "   🔑 DB Pass: $DB_PASS"
     
     echo -e "\n${YELLOW}Tekan Enter untuk kembali...${NC}"
@@ -443,7 +397,6 @@ install_crud() {
     clear
     echo -e "${GREEN}╔════════════════════════════════════════════════╗${NC}"
     echo -e "${GREEN}║         🗄️  INSTALL CRUD WEB                   ║${NC}"
-    echo -e "${GREEN}║         (SQLite Database)                     ║${NC}"
     echo -e "${GREEN}╚════════════════════════════════════════════════╝${NC}"
     
     apt install php-sqlite3 -y -qq
@@ -454,68 +407,47 @@ install_crud() {
 <!DOCTYPE html>
 <html>
 <head>
-    <title>FahTech - CRUD App</title>
+    <title>FahTech CRUD</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { background: #f0f2f5; font-family: 'Segoe UI', Arial, sans-serif; padding: 40px; }
-        .container { max-width: 800px; margin: 0 auto; background: white; border-radius: 15px; padding: 30px; box-shadow: 0 5px 20px rgba(0,0,0,0.1); }
-        h1 { color: #667eea; margin-bottom: 10px; }
-        hr { margin: 20px 0; border: none; height: 1px; background: #ddd; }
-        form { display: flex; gap: 10px; margin-bottom: 30px; }
-        input { flex: 1; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; }
-        button { background: #667eea; color: white; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-size: 16px; }
-        button:hover { background: #5a67d8; }
-        .success { background: #d4edda; color: #155724; padding: 12px; border-radius: 8px; margin-bottom: 20px; }
+        body { background: #f0f2f5; font-family: Arial; padding: 40px; }
+        .container { max-width: 800px; margin: auto; background: white; border-radius: 15px; padding: 30px; }
+        h1 { color: #667eea; }
+        form { display: flex; gap: 10px; margin-bottom: 20px; }
+        input { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 5px; }
+        button { background: #667eea; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; }
         table { width: 100%; border-collapse: collapse; }
-        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
-        th { background: #f8f9fa; color: #333; }
+        th, td { padding: 10px; text-align: left; border-bottom: 1px solid #ddd; }
         .delete { color: red; text-decoration: none; }
-        .delete:hover { text-decoration: underline; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>⚡ FahTech CRUD App</h1>
-        <p>Simple Create, Read, Update, Delete dengan SQLite</p>
-        <hr>
-        
-        <?php
-        $db = new SQLite3('/var/www/html/crud/data.db');
-        $db->exec("CREATE TABLE IF NOT EXISTS items (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)");
-        
-        if (isset($_POST['add']) && !empty($_POST['name'])) {
-            $name = SQLite3::escapeString($_POST['name']);
-            $db->exec("INSERT INTO items (name) VALUES ('$name')");
-            echo "<div class='success'>✅ Item berhasil ditambahkan!</div>";
-        }
-        
-        if (isset($_GET['delete'])) {
-            $id = (int)$_GET['delete'];
-            $db->exec("DELETE FROM items WHERE id = $id");
-            echo "<div class='success'>✅ Item berhasil dihapus!</div>";
-        }
-        
-        $result = $db->query("SELECT * FROM items ORDER BY id DESC");
-        ?>
-        
-        <form method="post">
-            <input type="text" name="name" placeholder="Masukkan nama item..." required>
-            <button type="submit" name="add">➕ Tambah Data</button>
-        </form>
-        
-        <h2>📋 Data Items</h2>
-        <table>
-            <tr><th>ID</th><th>Nama Item</th><th>Tanggal Dibuat</th><th>Aksi</th></tr>
-            <?php while ($row = $result->fetchArray()): ?>
-            <tr>
-                <td><?= $row['id'] ?></td>
-                <td><?= htmlspecialchars($row['name']) ?></td>
-                <td><?= $row['created_at'] ?></td>
-                <td><a href="?delete=<?= $row['id'] ?>" class="delete" onclick="return confirm('Yakin hapus?')">🗑️ Hapus</a></td>
-            </tr>
-            <?php endwhile; ?>
-        </table>
-    </div>
+<div class="container">
+    <h1>⚡ FahTech CRUD App</h1>
+    <?php
+    $db = new SQLite3('/var/www/html/crud/data.db');
+    $db->exec("CREATE TABLE IF NOT EXISTS items (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)");
+    if (isset($_POST['add']) && !empty($_POST['name'])) {
+        $name = SQLite3::escapeString($_POST['name']);
+        $db->exec("INSERT INTO items (name) VALUES ('$name')");
+        echo "<p style='color:green'>✅ Berhasil!</p>";
+    }
+    if (isset($_GET['delete'])) {
+        $id = (int)$_GET['delete'];
+        $db->exec("DELETE FROM items WHERE id = $id");
+    }
+    $result = $db->query("SELECT * FROM items ORDER BY id DESC");
+    ?>
+    <form method="post">
+        <input type="text" name="name" placeholder="Nama item..." required>
+        <button type="submit" name="add">Tambah</button>
+    </form>
+    <h2>Data Items</h2>
+    <table><tr><th>ID</th><th>Nama</th><th>Tanggal</th><th>Aksi</th></tr>
+    <?php while ($row = $result->fetchArray()): ?>
+    <tr><td><?= $row['id'] ?></td><td><?= htmlspecialchars($row['name']) ?></td><td><?= $row['created_at'] ?></td><td><a href="?delete=<?= $row['id'] ?>" class="delete">Hapus</a></td></tr>
+    <?php endwhile; ?>
+    </table>
+</div>
 </body>
 </html>
 EOF
@@ -533,13 +465,12 @@ EOF
 }
 
 # ============================================================
-# 9. INSTALL SEMUA SEKALIGUS
+# 9. INSTALL SEMUA
 # ============================================================
 install_all() {
     clear
     echo -e "${GREEN}╔════════════════════════════════════════════════╗${NC}"
     echo -e "${GREEN}║      ⚡ INSTALL SEMUA SERVICE                  ║${NC}"
-    echo -e "${GREEN}║      Proses akan memakan waktu beberapa menit ║${NC}"
     echo -e "${GREEN}╚════════════════════════════════════════════════╝${NC}"
     
     echo -e "\n${YELLOW}Mulai install semua service? (y/n):${NC}"
@@ -555,10 +486,7 @@ install_all() {
         install_wordpress
         install_crud
         
-        echo -e "\n${GREEN}╔════════════════════════════════════════════════╗${NC}"
-        echo -e "${GREEN}║   ✅ SEMUA SERVICE BERHASIL DIINSTALL!        ║${NC}"
-        echo -e "${GREEN}║   🎉 SELAMAT! SERVER ANDA SIAP DIGUNAKAN     ║${NC}"
-        echo -e "${GREEN}╚════════════════════════════════════════════════╝${NC}"
+        echo -e "\n${GREEN}✅ SEMUA SERVICE BERHASIL DIINSTALL!${NC}"
     fi
     
     echo -e "\n${YELLOW}Tekan Enter untuk kembali...${NC}"
@@ -572,24 +500,19 @@ while true; do
     clear
     echo -e "${CYAN}"
     echo "╔════════════════════════════════════════════════════════════╗"
-    echo "║                                                            ║"
     echo "║            🚀 FAHTECH MULTI-SERVICE INSTALLER              ║"
-    echo "║                                                            ║"
     echo "║         ⚡ PLUG AND PLAY | TINGGAL PILIH NOMOR ⚡          ║"
-    echo "║                                                            ║"
     echo "╠════════════════════════════════════════════════════════════╣"
-    echo "║                                                            ║"
-    echo "║  ${GREEN}1${NC}. ⚡ Install SEMUA Service (Auto Detect)              ║"
-    echo "║  ${GREEN}2${NC}. 🌐 Install DHCP Server (Otomatis Deteksi Interface) ║"
-    echo "║  ${GREEN}3${NC}. 🔍 Install DNS Server (Pilih Interface + Input Domain)║"
-    echo "║  ${GREEN}4${NC}. 🌍 Install Apache2 + Landing Page FahTech         ║"
-    echo "║  ${GREEN}5${NC}. 📁 Install FTP Server (vsftpd)                    ║"
-    echo "║  ${GREEN}6${NC}. 🖥️  Install Samba File Server                     ║"
-    echo "║  ${GREEN}7${NC}. 📧 Install Mail Server (Postfix+Dovecot)          ║"
-    echo "║  ${GREEN}8${NC}. 📝 Install WordPress + Database Auto Setup        ║"
-    echo "║  ${GREEN}9${NC}. 🗄️  Install CRUD Web (SQLite)                    ║"
-    echo "║  ${GREEN}10${NC}. 🚪 Exit                                          ║"
-    echo "║                                                            ║"
+    echo "║  1. ⚡ Install SEMUA Service                               ║"
+    echo "║  2. 🌐 Install DHCP Server (Otomatis Deteksi Interface)    ║"
+    echo "║  3. 🔍 Install DNS Server                                 ║"
+    echo "║  4. 🌍 Install Apache2 + Landing Page                     ║"
+    echo "║  5. 📁 Install FTP Server                                 ║"
+    echo "║  6. 🖥️  Install Samba File Server                         ║"
+    echo "║  7. 📧 Install Mail Server                                ║"
+    echo "║  8. 📝 Install WordPress + Database Auto Setup            ║"
+    echo "║  9. 🗄️  Install CRUD Web                                  ║"
+    echo "║  10. 🚪 Exit                                              ║"
     echo "╚════════════════════════════════════════════════════════════╝"
     echo -e "${NC}"
     
@@ -606,7 +529,7 @@ while true; do
         8) install_wordpress ;;
         9) install_crud ;;
         10) 
-            echo -e "${GREEN}👋 Terima kasih sudah menggunakan FahTech Installer!${NC}"
+            echo -e "${GREEN}👋 Terima kasih!${NC}"
             exit 0
             ;;
         *) 
