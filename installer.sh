@@ -2,7 +2,7 @@
 
 # ============================================================
 #   FAHTECH - MULTI-SERVICE INSTALLER PRO FINAL
-#   SEMUA SERVICE + WEBMAIL + DNS TERINTEGRASI
+#   AUTO DETECT IP | CRUD SISWA | WEBMAIL | ALL SERVICE
 # ============================================================
 
 RED='\033[0;31m'
@@ -12,18 +12,24 @@ BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 NC='\033[0m'
 
+# Deteksi IP otomatis
+SERVER_IP=$(hostname -I | awk '{print $1}')
 clear
+
 echo -e "${CYAN}"
-echo "╔═══════════════════════════════════════════════════════════════════╗"
-echo "║    ███████╗ █████╗ ██╗  ██╗████████╗███████╗ ██████╗██╗  ██╗     ║"
-echo "║    ██╔════╝██╔══██╗██║  ██║╚══██╔══╝██╔════╝██╔════╝██║  ██║     ║"
-echo "║    █████╗  ███████║███████║   ██║   █████╗  ██║     ███████║     ║"
-echo "║    ██╔══╝  ██╔══██║██╔══██║   ██║   ██╔══╝  ██║     ██╔══██║     ║"
-echo "║    ██║     ██║  ██║██║  ██║   ██║   ███████╗╚██████╗██║  ██║     ║"
-echo "║    ╚═╝     ╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝   ╚══════╝ ╚═════╝╚═╝  ╚═╝     ║"
-echo "║                   MULTI-SERVICE INSTALLER FINAL                   ║"
-echo "║              WEBMAIL + DNS + CRUD + MAIL SERVER                   ║"
-echo "╚═══════════════════════════════════════════════════════════════════╝"
+echo "╔══════════════════════════════════════════════════════════════════╗"
+echo "║                                                                  ║"
+echo "║   ███████╗ █████╗ ██╗  ██╗████████╗███████╗ ██████╗██╗  ██╗     ║"
+echo "║   ██╔════╝██╔══██╗██║  ██║╚══██╔══╝██╔════╝██╔════╝██║  ██║     ║"
+echo "║   █████╗  ███████║███████║   ██║   █████╗  ██║     ███████║     ║"
+echo "║   ██╔══╝  ██╔══██║██╔══██║   ██║   ██╔══╝  ██║     ██╔══██║     ║"
+echo "║   ██║     ██║  ██║██║  ██║   ██║   ███████╗╚██████╗██║  ██║     ║"
+echo "║   ╚═╝     ╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝   ╚══════╝ ╚═════╝╚═╝  ╚═╝     ║"
+echo "║                                                                  ║"
+echo "║              MULTI-SERVICE INSTALLER PROFESSIONAL                ║"
+echo "║                   AUTO DETECT IP: ${GREEN}$SERVER_IP${CYAN}                    ║"
+echo "║              CRUD SISWA + WEBMAIL + MAIL SERVER                  ║"
+echo "╚══════════════════════════════════════════════════════════════════╝"
 echo -e "${NC}"
 
 if [[ $EUID -ne 0 ]]; then
@@ -61,8 +67,6 @@ install_apache2() {
     
     apt update -qq
     apt install apache2 php libapache2-mod-php php-mysql php-curl php-gd php-xml php-mbstring php-zip php-sqlite3 -y -qq
-    
-    SERVER_IP=$(hostname -I | awk '{print $1}')
     
     cat > /var/www/html/index.html <<EOF
 <!DOCTYPE html>
@@ -172,7 +176,6 @@ EOF
         echo "$DNS_IP" > /etc/mailip.conf
         
         echo -e "\n${GREEN}✅ DNS BERHASIL! Domain: $MAIN_DOMAIN -> $DNS_IP${NC}"
-        echo -e "   📧 Webmail nanti bisa akses: http://mail.$MAIN_DOMAIN/roundcube/"
     fi
     read -p "Tekan Enter..."
 }
@@ -188,9 +191,7 @@ install_ftp() {
     systemctl restart vsftpd
     systemctl enable vsftpd
     
-    echo -e "\n${GREEN}✅ FTP BERHASIL!${NC}"
-    echo -e "   📌 Akses: ftp://$(hostname -I | awk '{print $1}')"
-    echo -e "   📌 Login pakai user Linux (contoh: root, fahri)"
+    echo -e "\n${GREEN}✅ FTP BERHASIL! Akses: ftp://$SERVER_IP${NC}"
     read -p "Tekan Enter..."
 }
 
@@ -218,11 +219,7 @@ install_samba() {
 EOF
     
     systemctl restart smbd
-    SERVER_IP=$(hostname -I | awk '{print $1}')
-    
-    echo -e "\n${GREEN}✅ SAMBA BERHASIL!${NC}"
-    echo -e "   📌 Akses Windows: \\\\$SERVER_IP\\$share_name"
-    echo -e "   📌 Lokasi file: /home/share"
+    echo -e "\n${GREEN}✅ SAMBA BERHASIL! Akses: \\\\$SERVER_IP\\$share_name${NC}"
     read -p "Tekan Enter..."
 }
 
@@ -244,7 +241,7 @@ install_mail() {
         if [[ $choice -ge 1 && $choice -le ${#INTERFACES[@]} ]]; then
             IFS='|' read -r DNS_IFACE DNS_IP <<< "${INTERFACES[$((choice-1))]}"
         else
-            DNS_IP=$(hostname -I | awk '{print $1}')
+            DNS_IP=$SERVER_IP
         fi
         
         echo -e "\n${YELLOW}📝 Masukkan domain (contoh: fahrinih.net):${NC}"
@@ -273,7 +270,6 @@ install_mail() {
     postconf -e "smtpd_sasl_type = dovecot"
     postconf -e "smtpd_sasl_path = private/auth"
     postconf -e "smtpd_sasl_auth_enable = yes"
-    postconf -e "smtpd_recipient_restrictions = permit_sasl_authenticated,permit_mynetworks,reject_unauth_destination"
     
     cat > /etc/dovecot/dovecot.conf <<EOF
 disable_plaintext_auth = no
@@ -352,15 +348,11 @@ MYSQL_SCRIPT
     chown -R www-data:www-data /var/www/html/
     systemctl restart apache2
     
-    SERVER_IP=$(hostname -I | awk '{print $1}')
-    
-    echo -e "\n${GREEN}✅ WORDPRESS BERHASIL!${NC}"
-    echo -e "   🌐 Akses: http://$SERVER_IP/wp-admin/install.php"
-    echo -e "   🔑 DB Password: $DB_PASS"
+    echo -e "\n${GREEN}✅ WORDPRESS BERHASIL! Akses: http://$SERVER_IP/wp-admin/install.php${NC}"
     read -p "Tekan Enter..."
 }
 
-# ======================= CRUD SISWA =======================
+# ======================= CRUD SISWA LENGKAP =======================
 install_crud() {
     clear
     echo -e "${GREEN}╔════════════════════════════════════════════════╗${NC}"
@@ -381,27 +373,33 @@ install_crud() {
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); font-family: 'Segoe UI', Arial, sans-serif; min-height: 100vh; padding: 40px; }
         .container { max-width: 1200px; margin: auto; background: white; border-radius: 20px; padding: 35px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); }
-        h1 { color: #667eea; }
-        .status { background: #4CAF50; color: white; padding: 5px 15px; border-radius: 20px; display: inline-block; font-size: 12px; margin-bottom: 20px; }
+        h1 { color: #667eea; margin-bottom: 10px; }
+        .subtitle { color: #666; margin-bottom: 20px; }
+        .status { background: #4CAF50; color: white; padding: 5px 15px; border-radius: 20px; display: inline-block; font-size: 12px; }
         .form-card { background: #f8f9fa; padding: 25px; border-radius: 15px; margin: 20px 0; }
         .form-group { display: flex; gap: 15px; flex-wrap: wrap; }
-        .form-group input { flex: 1; padding: 12px; border: 1px solid #ddd; border-radius: 10px; }
-        button { background: #667eea; color: white; border: none; padding: 12px 30px; border-radius: 10px; cursor: pointer; }
+        .form-group input { flex: 1; padding: 12px; border: 1px solid #ddd; border-radius: 10px; font-size: 14px; }
+        button { background: #667eea; color: white; border: none; padding: 12px 30px; border-radius: 10px; cursor: pointer; font-size: 14px; font-weight: bold; }
+        button:hover { background: #5a67d8; }
         .search-box { margin: 20px 0; display: flex; gap: 10px; }
         .search-box input { flex: 1; padding: 12px; border: 1px solid #ddd; border-radius: 10px; }
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
         th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
         th { background: #667eea; color: white; }
+        tr:hover { background: #f5f5f5; }
         .edit-btn { background: #3498db; color: white; padding: 6px 15px; border-radius: 8px; text-decoration: none; margin-right: 5px; display: inline-block; }
         .delete-btn { background: #e74c3c; color: white; padding: 6px 15px; border-radius: 8px; text-decoration: none; display: inline-block; }
-        .edit-form { background: #fff3cd; padding: 20px; border-radius: 15px; margin-top: 30px; }
+        .edit-form { background: #fff3cd; padding: 20px; border-radius: 15px; margin-top: 30px; border-left: 5px solid #ffc107; }
         .success { background: #d4edda; color: #155724; padding: 12px; border-radius: 10px; margin: 15px 0; }
-        .footer { margin-top: 30px; text-align: center; color: #888; }
+        .error { background: #f8d7da; color: #721c24; padding: 12px; border-radius: 10px; margin: 15px 0; }
+        .footer { margin-top: 30px; text-align: center; color: #888; font-size: 12px; }
+        @media (max-width: 768px) { .form-group { flex-direction: column; } }
     </style>
 </head>
 <body>
 <div class="container">
     <h1>📚 FahTech CRUD - Data Siswa</h1>
+    <div class="subtitle">Sistem Manajemen Data Siswa (Nama, Rombel, NIS)</div>
     <div class="status">✅ DATABASE ACTIVE | SQLite</div>
     
     <?php
@@ -414,28 +412,28 @@ install_crud() {
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )");
     
-    // TAMBAH
+    // TAMBAH DATA
     if (isset($_POST['add']) && !empty($_POST['nama']) && !empty($_POST['rombel']) && !empty($_POST['nis'])) {
         $nama = SQLite3::escapeString($_POST['nama']);
         $rombel = SQLite3::escapeString($_POST['rombel']);
         $nis = SQLite3::escapeString($_POST['nis']);
         $check = $db->querySingle("SELECT COUNT(*) FROM siswa WHERE nis = '$nis'");
         if ($check > 0) {
-            echo "<div class='success' style='background:#f8d7da; color:#721c24;'>❌ NIS sudah terdaftar!</div>";
+            echo "<div class='error'>❌ Gagal! NIS $nis sudah terdaftar!</div>";
         } else {
             $db->exec("INSERT INTO siswa (nama, rombel, nis) VALUES ('$nama', '$rombel', '$nis')");
-            echo "<div class='success'>✅ Data berhasil ditambahkan!</div>";
+            echo "<div class='success'>✅ Data siswa berhasil ditambahkan!</div>";
         }
     }
     
-    // HAPUS
+    // HAPUS DATA
     if (isset($_GET['delete'])) {
         $id = (int)$_GET['delete'];
         $db->exec("DELETE FROM siswa WHERE id = $id");
         echo "<div class='success'>✅ Data berhasil dihapus!</div>";
     }
     
-    // UPDATE
+    // UPDATE DATA
     if (isset($_POST['update'])) {
         $id = (int)$_POST['id'];
         $nama = SQLite3::escapeString($_POST['nama']);
@@ -443,55 +441,70 @@ install_crud() {
         $nis = SQLite3::escapeString($_POST['nis']);
         $check = $db->querySingle("SELECT COUNT(*) FROM siswa WHERE nis = '$nis' AND id != $id");
         if ($check > 0) {
-            echo "<div class='success' style='background:#f8d7da; color:#721c24;'>❌ NIS sudah terdaftar untuk siswa lain!</div>";
+            echo "<div class='error'>❌ Gagal! NIS $nis sudah terdaftar untuk siswa lain!</div>";
         } else {
             $db->exec("UPDATE siswa SET nama='$nama', rombel='$rombel', nis='$nis' WHERE id=$id");
-            echo "<div class='success'>✅ Data berhasil diupdate!</div>";
+            echo "<div class='success'>✅ Data siswa berhasil diupdate!</div>";
         }
     }
     
+    // PENCARIAN
     $search = isset($_GET['search']) ? SQLite3::escapeString($_GET['search']) : '';
     $where = $search ? "WHERE nama LIKE '%$search%' OR nis LIKE '%$search%' OR rombel LIKE '%$search%'" : "";
     $result = $db->query("SELECT * FROM siswa $where ORDER BY id DESC");
     ?>
     
+    <!-- FORM TAMBAH DATA -->
     <div class="form-card">
-        <h3>➕ Tambah Data Siswa</h3>
+        <h3 style="margin-bottom: 15px;">➕ Tambah Data Siswa</h3>
         <form method="post">
             <div class="form-group">
-                <input type="text" name="nama" placeholder="Nama Lengkap" required>
-                <input type="text" name="rombel" placeholder="Rombel / Kelas" required>
-                <input type="text" name="nis" placeholder="NIS" required>
-                <button type="submit" name="add">💾 Simpan</button>
+                <input type="text" name="nama" placeholder="Nama Lengkap *" required>
+                <input type="text" name="rombel" placeholder="Rombel / Kelas *" required>
+                <input type="text" name="nis" placeholder="NIS (Nomor Induk Siswa) *" required>
+                <button type="submit" name="add">💾 Simpan Data</button>
             </div>
         </form>
     </div>
     
+    <!-- FORM PENCARIAN -->
     <div class="search-box">
         <form method="get" style="display: flex; gap: 10px; width: 100%;">
-            <input type="text" name="search" placeholder="🔍 Cari data..." value="<?= htmlspecialchars($search) ?>">
+            <input type="text" name="search" placeholder="🔍 Cari berdasarkan Nama / NIS / Rombel..." value="<?= htmlspecialchars($search) ?>">
             <button type="submit">Cari</button>
-            <?php if($search): ?><a href="?" style="background: #6c757d; color: white; padding: 12px 20px; border-radius: 10px; text-decoration: none;">Reset</a><?php endif; ?>
+            <?php if($search): ?>
+                <a href="?" style="background: #6c757d; color: white; padding: 12px 20px; border-radius: 10px; text-decoration: none;">Reset</a>
+            <?php endif; ?>
         </form>
     </div>
     
-    <h3>📋 Daftar Siswa</h3>
+    <!-- TABEL DATA -->
+    <h3 style="margin: 20px 0 10px;">📋 Daftar Siswa</h3>
     <table>
-        <thead><tr><th>ID</th><th>Nama</th><th>Rombel</th><th>NIS</th><th>Tanggal</th><th>Aksi</th></tr></thead>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Nama Lengkap</th>
+                <th>Rombel / Kelas</th>
+                <th>NIS</th>
+                <th>Tanggal Dibuat</th>
+                <th>Aksi</th>
+            </tr>
+        </thead>
         <tbody>
-        <?php while ($row = $result->fetchArray()): ?>
-        <tr>
-            <td><?= $row['id'] ?></td>
-            <td><strong><?= htmlspecialchars($row['nama']) ?></strong></td>
-            <td><?= htmlspecialchars($row['rombel']) ?></td>
-            <td><?= htmlspecialchars($row['nis']) ?></td>
-            <td><?= date('d/m/Y H:i', strtotime($row['created_at'])) ?></td>
-            <td>
-                <a href="?edit=<?= $row['id'] ?>" class="edit-btn">✏️ Edit</a>
-                <a href="?delete=<?= $row['id'] ?>" class="delete-btn" onclick="return confirm('Yakin hapus?')">🗑️ Hapus</a>
-            </td>
-        </tr>
-        <?php endwhile; ?>
+            <?php while ($row = $result->fetchArray()): ?>
+            <tr>
+                <td><strong><?= $row['id'] ?></strong></td>
+                <td><?= htmlspecialchars($row['nama']) ?></td>
+                <td><?= htmlspecialchars($row['rombel']) ?></td>
+                <td><code><?= htmlspecialchars($row['nis']) ?></code></td>
+                <td><?= date('d/m/Y H:i', strtotime($row['created_at'])) ?></td>
+                <td>
+                    <a href="?edit=<?= $row['id'] ?>" class="edit-btn">✏️ Edit</a>
+                    <a href="?delete=<?= $row['id'] ?>" class="delete-btn" onclick="return confirm('Yakin hapus data ini?')">🗑️ Hapus</a>
+                </td>
+            </tr>
+            <?php endwhile; ?>
         </tbody>
     </table>
     
@@ -501,21 +514,23 @@ install_crud() {
         if ($edit):
     ?>
     <div class="edit-form">
-        <h3>✏️ Edit Data</h3>
+        <h3>✏️ Edit Data Siswa (ID: <?= $edit['id'] ?>)</h3>
         <form method="post">
             <input type="hidden" name="id" value="<?= $edit['id'] ?>">
             <div class="form-group">
                 <input type="text" name="nama" value="<?= htmlspecialchars($edit['nama']) ?>" required>
                 <input type="text" name="rombel" value="<?= htmlspecialchars($edit['rombel']) ?>" required>
                 <input type="text" name="nis" value="<?= htmlspecialchars($edit['nis']) ?>" required>
-                <button type="submit" name="update">💾 Update</button>
+                <button type="submit" name="update">💾 Update Data</button>
                 <a href="?" style="background: #6c757d; color: white; padding: 12px 20px; border-radius: 10px; text-decoration: none;">Batal</a>
             </div>
         </form>
     </div>
     <?php endif; endif; ?>
     
-    <div class="footer">FahTech CRUD | Total: <?= $db->querySingle("SELECT COUNT(*) FROM siswa") ?> siswa</div>
+    <div class="footer">
+        <strong>FahTech CRUD - Data Siswa</strong> | Total Data: <?= $db->querySingle("SELECT COUNT(*) FROM siswa") ?> siswa
+    </div>
 </div>
 </body>
 </html>
@@ -524,20 +539,17 @@ EOF
     chown -R www-data:www-data /var/www/html/crud
     systemctl restart apache2
     
-    SERVER_IP=$(hostname -I | awk '{print $1}')
-    
     echo -e "\n${GREEN}✅ CRUD SISWA BERHASIL!${NC}"
     echo -e "   🌐 Akses: http://$SERVER_IP/crud/"
-    echo -e "   📌 Fitur: Tambah | Edit | Hapus | Cari"
+    echo -e "   📌 Fitur: ✨ Tambah Data | ✏️ Edit Data | 🗑️ Hapus Data | 🔍 Cari Data"
     read -p "Tekan Enter..."
 }
 
-# ======================= WEBMAIL (FIX) =======================
+# ======================= WEBMAIL =======================
 install_webmail() {
     clear
     echo -e "${GREEN}╔════════════════════════════════════════════════╗${NC}"
     echo -e "${GREEN}║         🌐 INSTALL WEBMAIL (ROUNDCUBE)         ║${NC}"
-    echo -e "${GREEN}║      Bisa akses via IP dan Domain              ║${NC}"
     echo -e "${GREEN}╚════════════════════════════════════════════════╝${NC}"
     
     if [[ -f /etc/maildomain.conf ]]; then
@@ -552,10 +564,8 @@ install_webmail() {
         return
     fi
     
-    # Install Roundcube dengan benar
-    apt install roundcube roundcube-mysql roundcube-core php-mysql dbconfig-common -y -qq
+    apt install roundcube roundcube-mysql roundcube-core php-mysql -y -qq
     
-    # Buat database
     DB_PASS=$(openssl rand -base64 12 | tr -d "=/+" | cut -c1-16)
     
     mysql -u root <<MYSQL_SCRIPT 2>/dev/null
@@ -565,12 +575,10 @@ GRANT ALL PRIVILEGES ON roundcubemail.* TO 'roundcube'@'localhost';
 FLUSH PRIVILEGES;
 MYSQL_SCRIPT
     
-    # Import skema database
     if [ -f /usr/share/roundcube/SQL/mysql.initial.sql ]; then
         mysql roundcubemail < /usr/share/roundcube/SQL/mysql.initial.sql 2>/dev/null
     fi
     
-    # Konfigurasi Roundcube
     cat > /etc/roundcube/config.inc.php <<EOF
 <?php
 \$config = array();
@@ -580,52 +588,36 @@ MYSQL_SCRIPT
 \$config['smtp_port'] = 25;
 \$config['smtp_user'] = '%u';
 \$config['smtp_pass'] = '%p';
-\$config['product_name'] = 'FahTech Webmail';
+\$config['product_name'] = 'FahTech Webmail - $MAIN_DOMAIN';
 \$config['plugins'] = array('archive', 'zipdownload');
 \$config['skin'] = 'elastic';
 EOF
     
-    # Konfigurasi Apache untuk Roundcube
     ln -sf /etc/roundcube/apache.conf /etc/apache2/conf-available/roundcube.conf
     a2enconf roundcube
     a2enmod rewrite
-    
-    # Buat alias tambahan untuk roundcube
-    cat > /etc/apache2/conf-available/roundcube-alias.conf <<EOF
-Alias /webmail /var/lib/roundcube
-Alias /email /var/lib/roundcube
-EOF
-    a2enconf roundcube-alias
-    
     systemctl restart apache2
     systemctl restart postfix dovecot
     
-    # Test apakah roundcube terinstall dengan benar
-    if [ -d /var/lib/roundcube ]; then
-        echo -e "\n${GREEN}✅ WEBMAIL ROUNDCUBE BERHASIL!${NC}"
-    else
-        echo -e "\n${YELLOW}⚠️ Webmail terinstall, cek manual: /var/lib/roundcube${NC}"
-    fi
-    
     echo -e "\n${GREEN}╔══════════════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${GREEN}║   🌐 AKSES WEBMAIL:                                              ║${NC}"
-    echo -e "${GREEN}║                                                                   ║${NC}"
-    echo -e "${GREEN}║   📌 Via IP:                                                      ║${NC}"
+    echo -e "${GREEN}║   ✅ WEBMAIL (ROUNDCUBE) BERHASIL!                                 ║${NC}"
+    echo -e "${GREEN}╠══════════════════════════════════════════════════════════════════╣${NC}"
+    echo -e "${GREEN}║                                                                    ║${NC}"
+    echo -e "${GREEN}║   🌐 AKSES VIA IP:                                                ║${NC}"
     echo -e "${GREEN}║      http://$DNS_IP/roundcube/                                    ║${NC}"
-    echo -e "${GREEN}║      http://$DNS_IP/webmail/                                      ║${NC}"
-    echo -e "${GREEN}║      http://$DNS_IP/email/                                        ║${NC}"
-    echo -e "${GREEN}║                                                                   ║${NC}"
-    echo -e "${GREEN}║   📌 Via Domain (setting hosts dulu):                             ║${NC}"
+    echo -e "${GREEN}║                                                                    ║${NC}"
+    echo -e "${GREEN}║   🌐 AKSES VIA DOMAIN (Setting hosts dulu):                        ║${NC}"
     echo -e "${GREEN}║      http://mail.$MAIN_DOMAIN/roundcube/                          ║${NC}"
-    echo -e "${GREEN}║                                                                   ║${NC}"
-    echo -e "${GREEN}║   📝 LOGIN:                                                       ║${NC}"
-    echo -e "${GREEN}║      👤 Username: $EMAIL_USER@$MAIN_DOMAIN                       ║${NC}"
-    echo -e "${GREEN}║      🔑 Password: $EMAIL_PASS                                     ║${NC}"
-    echo -e "${GREEN}║                                                                   ║${NC}"
-    echo -e "${GREEN}║   💡 Cara akses pakai domain:                                     ║${NC}"
-    echo -e "${GREEN}║      Edit file hosts (Windows: C:\\Windows\\System32\\drivers\\etc\\hosts)${NC}"
-    echo -e "${GREEN}║      Tambah: $DNS_IP mail.$MAIN_DOMAIN                            ║${NC}"
-    echo -e "${GREEN}║      Lalu akses: http://mail.$MAIN_DOMAIN/roundcube/              ║${NC}"
+    echo -e "${GREEN}║                                                                    ║${NC}"
+    echo -e "${GREEN}║   📝 LOGIN:                                                        ║${NC}"
+    echo -e "${GREEN}║      👤 Username: $EMAIL_USER@$MAIN_DOMAIN                        ║${NC}"
+    echo -e "${GREEN}║      🔑 Password: $EMAIL_PASS                                      ║${NC}"
+    echo -e "${GREEN}║                                                                    ║${NC}"
+    echo -e "${GREEN}║   💡 CARA SETTING DOMAIN:                                          ║${NC}"
+    echo -e "${GREEN}║      Windows: C:\\Windows\\System32\\drivers\\etc\\hosts              ║${NC}"
+    echo -e "${GREEN}║      Linux/Mac: /etc/hosts                                        ║${NC}"
+    echo -e "${GREEN}║      Tambahkan: $DNS_IP mail.$MAIN_DOMAIN                         ║${NC}"
+    echo -e "${GREEN}║                                                                    ║${NC}"
     echo -e "${GREEN}╚══════════════════════════════════════════════════════════════════╝${NC}"
     
     read -p "Tekan Enter..."
@@ -637,10 +629,10 @@ while true; do
     echo -e "${CYAN}"
     echo "╔══════════════════════════════════════════════════════════════════╗"
     echo "║            🚀 FAHTECH MULTI-SERVICE INSTALLER FINAL             ║"
-    echo "║         SEMUA SERVICE + WEBMAIL (IP + DOMAIN)                    ║"
+    echo "║         AUTO DETECT IP: ${GREEN}$SERVER_IP${CYAN}                              ║"
     echo "╠══════════════════════════════════════════════════════════════════╣"
     echo "║                                                                  ║"
-    echo "║  1.  ⚡ Install SEMUA Service (REKOMENDED)                       ║"
+    echo "║  1.  ⚡ INSTALL SEMUA SERVICE (REKOMENDED)                       ║"
     echo "║  2.  🌐 Install DHCP Server                                     ║"
     echo "║  3.  🔍 Install DNS Server                                      ║"
     echo "║  4.  🌍 Install Apache2                                         ║"
@@ -648,8 +640,8 @@ while true; do
     echo "║  6.  🖥️  Install Samba                                          ║"
     echo "║  7.  📧 Install Mail Server                                     ║"
     echo "║  8.  📝 Install WordPress                                       ║"
-    echo "║  9.  🗄️  Install CRUD Siswa (Nama+Rombel+NIS)                   ║"
-    echo "║  10. 🌐 Install WEBMAIL (Roundcube) - Bisa akses via Domain     ║"
+    echo "║  9.  🗄️  Install CRUD SISWA (Nama + Rombel + NIS)               ║"
+    echo "║  10. 🌐 Install WEBMAIL (Roundcube) - Akses Email via Browser   ║"
     echo "║  11. 🚪 Exit                                                    ║"
     echo "╚══════════════════════════════════════════════════════════════════╝"
     echo -e "${NC}"
@@ -667,10 +659,18 @@ while true; do
             install_wordpress
             install_crud
             install_webmail
-            DNS_IP=$(cat /etc/mailip.conf 2>/dev/null || hostname -I | awk '{print $1}')
-            echo -e "\n${GREEN}🎉 SEMUA SERVICE BERHASIL!${NC}"
-            echo -e "   🌐 CRUD: http://$DNS_IP/crud/"
-            echo -e "   📧 Webmail: http://$DNS_IP/roundcube/"
+            echo -e "\n${GREEN}╔══════════════════════════════════════════════════════════════════╗${NC}"
+            echo -e "${GREEN}║   🎉 SEMUA SERVICE BERHASIL DIINSTALL! 🎉                         ║${NC}"
+            echo -e "${GREEN}╠══════════════════════════════════════════════════════════════════╣${NC}"
+            echo -e "${GREEN}║                                                                    ║${NC}"
+            echo -e "${GREEN}║   🌐 LANDING PAGE:  http://$SERVER_IP                              ║${NC}"
+            echo -e "${GREEN}║   🗄️  CRUD SISWA:   http://$SERVER_IP/crud/                       ║${NC}"
+            echo -e "${GREEN}║   📧 WEBMAIL:       http://$SERVER_IP/roundcube/                  ║${NC}"
+            echo -e "${GREEN}║   📝 WORDPRESS:     http://$SERVER_IP/wp-admin                    ║${NC}"
+            echo -e "${GREEN}║                                                                    ║${NC}"
+            echo -e "${GREEN}║   📧 LOGIN WEBMAIL: $EMAIL_USER@$MAIN_DOMAIN / $EMAIL_PASS        ║${NC}"
+            echo -e "${GREEN}║                                                                    ║${NC}"
+            echo -e "${GREEN}╚══════════════════════════════════════════════════════════════════╝${NC}"
             ;;
         2) install_dhcp ;;
         3) install_dns ;;
