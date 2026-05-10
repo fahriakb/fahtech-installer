@@ -1,9 +1,9 @@
 #!/bin/bash
 
 # ============================================================
-#   FAHTECH - MULTI-SERVICE INSTALLER PRO v8.0
-#   CRUD LENGKAP (TAMBAH, EDIT, HAPUS, CARI)
-#   MAIL SERVER + WEBMAIL (LOGIN & KIRIM EMAIL)
+#   FAHTECH - MULTI-SERVICE INSTALLER PRO v9.0
+#   MAIL SERVER + WEBMAIL + CRUD LENGKAP
+#   DENGAN CONTOH DAN TUTORIAL LENGKAP
 # ============================================================
 
 RED='\033[0;31m'
@@ -26,8 +26,8 @@ echo "║   ██║     ██║  ██║██║  ██║   ██║  
 echo "║   ╚═╝     ╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝   ╚══════╝ ╚═════╝╚═╝  ╚═╝                 ║"
 echo "║                                                                              ║"
 echo "║                 MULTI-SERVICE INSTALLER PROFESSIONAL                         ║"
-echo "║              CRUD LENGKAP + MAIL SERVER + WEBMAIL                           ║"
-echo "║                       VERSI 8.0 - 2026                                      ║"
+echo "║              MAIL SERVER + WEBMAIL + CRUD LENGKAP                           ║"
+echo "║                       VERSI 9.0 - 2026                                      ║"
 echo "╚══════════════════════════════════════════════════════════════════════════════╝"
 echo -e "${NC}"
 
@@ -105,20 +105,13 @@ install_apache2() {
 body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); font-family: Arial; text-align: center; padding: 50px; }
 h1 { color: white; font-size: 48px; }
 .status { background: #4CAF50; padding: 10px; border-radius: 10px; color: white; }
-.services { display: flex; justify-content: center; gap: 20px; margin-top: 30px; flex-wrap: wrap; }
-.service { background: white; padding: 15px; border-radius: 10px; min-width: 120px; }
 </style>
 </head>
 <body>
 <h1>⚡ FAHTECH SERVER ⚡</h1>
 <div class="status">✅ ALL SERVICES RUNNING</div>
 <p style="color:white;">Server IP: <?php echo $_SERVER['SERVER_ADDR']; ?></p>
-<div class="services">
-<div class="service">🌐 Web Server</div><div class="service">📧 Mail Server</div>
-<div class="service">📝 WordPress</div><div class="service">🗄️ CRUD App</div>
-<div class="service">🌍 Webmail</div>
-</div>
-<p style="color:white;">Powered by FahTech Auto Installer v8.0</p>
+<p style="color:white;">Powered by FahTech Auto Installer v9.0</p>
 </body>
 </html>
 EOF
@@ -178,7 +171,7 @@ install_dns() {
         IFS='|' read -r DNS_IFACE DNS_IP <<< "${INTERFACES[$((choice-1))]}"
         
         echo -e "\n${CYAN}📝 Masukkan domain utama:${NC}"
-        echo -e "${YELLOW}   Contoh: fahrinih.net, perusahaan.com${NC}"
+        echo -e "${YELLOW}   📌 Contoh: fahrinih.net, perusahaan.com, toko123.id${NC}"
         read -p "Domain: " MAIN_DOMAIN
         
         apt install bind9 bind9utils -y -qq
@@ -208,7 +201,10 @@ EOF
         echo "$MAIN_DOMAIN" > /etc/maildomain.conf
         echo "$DNS_IP" > /etc/mailip.conf
         
-        echo -e "\n${GREEN}✅ DNS BERHASIL! Domain: $MAIN_DOMAIN -> $DNS_IP${NC}"
+        echo -e "\n${GREEN}✅ DNS BERHASIL!${NC}"
+        echo -e "   📝 Domain: $MAIN_DOMAIN"
+        echo -e "   🌐 IP: $DNS_IP"
+        echo -e "   📧 Subdomain mail: mail.$MAIN_DOMAIN"
     fi
     echo -e "\n${YELLOW}Tekan Enter...${NC}"
     read
@@ -261,7 +257,7 @@ EOF
     read
 }
 
-# ======================= 6. MAIL SERVER (LENGKAP + LOGIN WEBMAIL) =======================
+# ======================= 6. MAIL SERVER (LENGKAP DENGAN CONTOH) =======================
 install_mail() {
     clear
     echo -e "${GREEN}╔══════════════════════════════════════════════════════════════════╗${NC}"
@@ -274,24 +270,38 @@ install_mail() {
         MAIN_DOMAIN=$(cat /etc/maildomain.conf)
         DNS_IP=$(cat /etc/mailip.conf)
         echo -e "\n${GREEN}✅ Domain terdeteksi dari DNS: $MAIN_DOMAIN${NC}"
-        echo -e "${YELLOW}Gunakan domain ini? (y/n):${NC}"
+        echo -e "${YELLOW}📌 Contoh: Jika domain Anda $MAIN_DOMAIN, maka email akan menggunakan @$MAIN_DOMAIN${NC}"
+        echo -e "\n${YELLOW}Gunakan domain ini? (y/n):${NC}"
         read -p "" use_domain
-        [[ "$use_domain" != "y" ]] && read -p "Domain baru: " MAIN_DOMAIN
+        if [[ "$use_domain" != "y" ]]; then
+            echo -e "\n${CYAN}📝 Masukkan domain utama:${NC}"
+            echo -e "${YELLOW}   📌 Contoh: fahrinih.net, perusahaan.com, toko123.id${NC}"
+            read -p "Domain: " MAIN_DOMAIN
+        fi
     else
-        echo -e "\n${CYAN}📝 Masukkan domain utama:${NC}"
-        echo -e "${YELLOW}   Contoh: fahrinih.net, perusahaan.com${NC}"
+        echo -e "\n${CYAN}📝 Masukkan domain utama untuk email:${NC}"
+        echo -e "${YELLOW}   📌 Contoh: fahrinih.net, perusahaan.com, toko123.id${NC}"
+        echo -e "${YELLOW}   📌 Nanti email akan menggunakan format: nama@domain.com${NC}"
         read -p "Domain: " MAIN_DOMAIN
-        DNS_IP=$(hostname -I | awk '{print $1}')
+        
+        show_interfaces
+        echo -e "\n${YELLOW}👉 Pilih interface untuk Mail Server:${NC}"
+        read -p "Nomor [1-${#INTERFACES[@]}]: " choice
+        if [[ $choice -ge 1 && $choice -le ${#INTERFACES[@]} ]]; then
+            IFS='|' read -r DNS_IFACE DNS_IP <<< "${INTERFACES[$((choice-1))]}"
+        else
+            DNS_IP=$(hostname -I | awk '{print $1}')
+        fi
     fi
     
-    # Input username & password email
     echo -e "\n${CYAN}📝 Buat akun email admin:${NC}"
-    echo -e "${YELLOW}   Contoh: admin, info, support${NC}"
+    echo -e "${YELLOW}   📌 Contoh username: admin, info, support, billing, cs${NC}"
+    echo -e "${YELLOW}   📌 Nanti login email dengan: username@$MAIN_DOMAIN${NC}"
     read -p "Username: " EMAIL_USER
     EMAIL_USER=${EMAIL_USER:-admin}
     
     echo -e "\n${CYAN}📝 Buat password untuk $EMAIL_USER@$MAIN_DOMAIN:${NC}"
-    echo -e "${YELLOW}   Minimal 5 karakter, contoh: admin123${NC}"
+    echo -e "${YELLOW}   📌 Contoh password: admin123, rahasia123, FahTech2024${NC}"
     read -s -p "Password: " EMAIL_PASS
     echo ""
     read -s -p "Konfirmasi password: " EMAIL_PASS_CONFIRM
@@ -305,6 +315,7 @@ install_mail() {
     MAIL_DOMAIN="mail.$MAIN_DOMAIN"
     
     echo -e "\n${CYAN}📦 Menginstall Mail Server...${NC}"
+    echo -e "${YELLOW}   ⏳ Proses ini memakan waktu 2-3 menit...${NC}"
     
     # Set hostname
     hostnamectl set-hostname $MAIL_DOMAIN
@@ -365,18 +376,25 @@ EOF
     echo "$MAIN_DOMAIN" > /etc/maildomain.conf
     echo "$DNS_IP" > /etc/mailip.conf
     echo "$EMAIL_USER" > /etc/mailuser.conf
+    echo "$EMAIL_PASS" > /etc/mailpass.conf
     
-    echo -e "\n${GREEN}╔══════════════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${GREEN}║   ✅ MAIL SERVER BERHASIL!                                        ║${NC}"
-    echo -e "${GREEN}╠══════════════════════════════════════════════════════════════════╣${NC}"
-    echo -e "${GREEN}║   📧 Email: $EMAIL_USER@$MAIN_DOMAIN                             ║${NC}"
-    echo -e "${GREEN}║   🔑 Password: $EMAIL_PASS                                       ║${NC}"
-    echo -e "${GREEN}║                                                                   ║${NC}"
-    echo -e "${GREEN}║   📌 LANJUTKAN INSTALL WEBMAIL (Menu 10)                         ║${NC}"
-    echo -e "${GREEN}║      Agar bisa akses email via browser!                         ║${NC}"
-    echo -e "${GREEN}╚══════════════════════════════════════════════════════════════════╝${NC}"
+    echo -e "\n${GREEN}╔════════════════════════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${GREEN}║   ✅ MAIL SERVER BERHASIL DIINSTALL!                                             ║${NC}"
+    echo -e "${GREEN}╠════════════════════════════════════════════════════════════════════════════════╣${NC}"
+    echo -e "${GREEN}║                                                                                ║${NC}"
+    echo -e "${GREEN}║   📧 EMAIL LOGIN:                                                              ║${NC}"
+    echo -e "${GREEN}║      👤 Username: $EMAIL_USER@$MAIN_DOMAIN                                    ║${NC}"
+    echo -e "${GREEN}║      🔑 Password: $EMAIL_PASS                                                  ║${NC}"
+    echo -e "${GREEN}║                                                                                ║${NC}"
+    echo -e "${GREEN}║   🌐 SUBDOMAIN MAIL:                                                           ║${NC}"
+    echo -e "${GREEN}║      📌 mail.$MAIN_DOMAIN                                                      ║${NC}"
+    echo -e "${GREEN}║                                                                                ║${NC}"
+    echo -e "${GREEN}║   📌 LANJUTKAN INSTALL WEBMAIL (Menu 10)                                       ║${NC}"
+    echo -e "${GREEN}║      Agar bisa akses email via browser dengan tampilan profesional!           ║${NC}"
+    echo -e "${GREEN}║                                                                                ║${NC}"
+    echo -e "${GREEN}╚════════════════════════════════════════════════════════════════════════════════╝${NC}"
     
-    echo -e "\n${YELLOW}Tekan Enter untuk kembali...${NC}"
+    echo -e "\n${YELLOW}Tekan Enter untuk lanjut ke instalasi Webmail (Menu 10)...${NC}"
     read
 }
 
@@ -425,7 +443,7 @@ MYSQL_SCRIPT
     read
 }
 
-# ======================= 8. CRUD WEB LENGKAP (TAMBAH, EDIT, HAPUS, CARI) =======================
+# ======================= 8. CRUD WEB LENGKAP =======================
 install_crud() {
     clear
     echo -e "${GREEN}╔════════════════════════════════════════════════════════════╗${NC}"
@@ -448,44 +466,31 @@ install_crud() {
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); font-family: 'Segoe UI', Arial, sans-serif; min-height: 100vh; padding: 40px; }
         .container { max-width: 1200px; margin: auto; background: white; border-radius: 20px; padding: 30px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
-        h1 { color: #667eea; margin-bottom: 10px; }
-        .status { background: #4CAF50; color: white; padding: 5px 15px; border-radius: 20px; display: inline-block; font-size: 12px; margin-bottom: 20px; }
+        h1 { color: #667eea; }
+        .status { background: #4CAF50; color: white; padding: 5px 15px; border-radius: 20px; display: inline-block; }
         .form-add { background: #f8f9fa; padding: 20px; border-radius: 15px; margin: 20px 0; display: flex; gap: 10px; flex-wrap: wrap; }
-        .form-add input, .form-add select { padding: 12px; border: 1px solid #ddd; border-radius: 8px; flex: 1; min-width: 150px; }
-        button { background: #667eea; color: white; border: none; padding: 12px 25px; border-radius: 8px; cursor: pointer; font-size: 16px; }
-        button:hover { background: #5a67d8; }
-        .search-box { margin: 20px 0; display: flex; gap: 10px; }
-        .search-box input { flex: 1; padding: 12px; border: 1px solid #ddd; border-radius: 8px; }
+        .form-add input { padding: 12px; border: 1px solid #ddd; border-radius: 8px; flex: 1; }
+        button { background: #667eea; color: white; border: none; padding: 12px 25px; border-radius: 8px; cursor: pointer; }
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
         th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
         th { background: #667eea; color: white; }
-        tr:hover { background: #f5f5f5; }
-        .edit-btn { background: #3498db; color: white; padding: 5px 12px; border-radius: 5px; text-decoration: none; margin-right: 5px; display: inline-block; }
-        .delete-btn { background: #e74c3c; color: white; padding: 5px 12px; border-radius: 5px; text-decoration: none; display: inline-block; }
-        .edit-form { background: #fff3cd; padding: 20px; border-radius: 15px; margin-top: 30px; border: 1px solid #ffecb3; }
+        .edit-btn { background: #3498db; color: white; padding: 5px 12px; border-radius: 5px; text-decoration: none; }
+        .delete-btn { background: #e74c3c; color: white; padding: 5px 12px; border-radius: 5px; text-decoration: none; }
+        .edit-form { background: #fff3cd; padding: 20px; border-radius: 15px; margin-top: 30px; }
         .success { background: #d4edda; color: #155724; padding: 12px; border-radius: 8px; margin: 10px 0; }
-        .footer { margin-top: 30px; text-align: center; color: #888; font-size: 12px; }
-        @media (max-width: 768px) { .form-add { flex-direction: column; } }
+        .footer { margin-top: 30px; text-align: center; color: #888; }
     </style>
 </head>
 <body>
 <div class="container">
     <h1>⚡ FahTech CRUD Application</h1>
-    <div class="status">✅ DATABASE ACTIVE | SQLite</div>
-    <p>Sistem Manajemen Data Lengkap dengan fitur Tambah, Edit, Hapus, dan Cari</p>
+    <div class="status">✅ DATABASE ACTIVE</div>
+    <p>Sistem Manajemen Data Lengkap (Tambah, Edit, Hapus, Cari)</p>
     
     <?php
     $db = new SQLite3('/var/www/html/crud/data.db');
-    $db->exec("CREATE TABLE IF NOT EXISTS items (
-        id INTEGER PRIMARY KEY AUTOINCREMENT, 
-        name TEXT NOT NULL, 
-        description TEXT,
-        category TEXT,
-        price INTEGER DEFAULT 0,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )");
+    $db->exec("CREATE TABLE IF NOT EXISTS items (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, description TEXT, category TEXT, price INTEGER DEFAULT 0, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)");
     
-    // Tambah Data
     if (isset($_POST['add']) && !empty($_POST['name'])) {
         $name = SQLite3::escapeString($_POST['name']);
         $desc = SQLite3::escapeString($_POST['description']);
@@ -495,14 +500,12 @@ install_crud() {
         echo "<div class='success'>✅ Data berhasil ditambahkan!</div>";
     }
     
-    // Hapus Data
     if (isset($_GET['delete'])) {
         $id = (int)$_GET['delete'];
         $db->exec("DELETE FROM items WHERE id = $id");
         echo "<div class='success'>✅ Data berhasil dihapus!</div>";
     }
     
-    // Update Data
     if (isset($_POST['update'])) {
         $id = (int)$_POST['id'];
         $name = SQLite3::escapeString($_POST['name']);
@@ -513,44 +516,30 @@ install_crud() {
         echo "<div class='success'>✅ Data berhasil diupdate!</div>";
     }
     
-    // Pencarian
     $search = isset($_GET['search']) ? SQLite3::escapeString($_GET['search']) : '';
-    $where = $search ? "WHERE name LIKE '%$search%' OR description LIKE '%$search%' OR category LIKE '%$search%'" : "";
+    $where = $search ? "WHERE name LIKE '%$search%' OR description LIKE '%$search%'" : "";
     $result = $db->query("SELECT * FROM items $where ORDER BY id DESC");
     ?>
     
-    <!-- Form Tambah Data -->
     <form method="post" class="form-add">
         <input type="text" name="name" placeholder="Nama Item *" required>
         <input type="text" name="description" placeholder="Deskripsi">
         <input type="text" name="category" placeholder="Kategori">
         <input type="number" name="price" placeholder="Harga">
-        <button type="submit" name="add">➕ Tambah Data</button>
+        <button type="submit" name="add">➕ Tambah</button>
     </form>
     
-    <!-- Form Pencarian -->
-    <div class="search-box">
-        <form method="get" style="display: flex; gap: 10px; width: 100%;">
-            <input type="text" name="search" placeholder="Cari data..." value="<?= htmlspecialchars($search) ?>">
+    <div style="margin: 20px 0; display: flex; gap: 10px;">
+        <form method="get" style="display: flex; gap: 10px; flex: 1;">
+            <input type="text" name="search" placeholder="Cari data..." value="<?= htmlspecialchars($search) ?>" style="flex: 1; padding: 12px; border-radius: 8px; border: 1px solid #ddd;">
             <button type="submit">🔍 Cari</button>
-            <?php if($search): ?>
-                <a href="?" style="background: #6c757d; color: white; padding: 12px 20px; border-radius: 8px; text-decoration: none;">Reset</a>
-            <?php endif; ?>
+            <?php if($search): ?><a href="?" style="background: #6c757d; color: white; padding: 12px 20px; border-radius: 8px; text-decoration: none;">Reset</a><?php endif; ?>
         </form>
     </div>
     
-    <!-- Tabel Data -->
     <h2>📋 Data Items</h2>
     <table>
-        <tr>
-            <th>ID</th>
-            <th>Nama Item</th>
-            <th>Deskripsi</th>
-            <th>Kategori</th>
-            <th>Harga</th>
-            <th>Tanggal</th>
-            <th>Aksi</th>
-        </tr>
+        <tr><th>ID</th><th>Nama</th><th>Deskripsi</th><th>Kategori</th><th>Harga</th><th>Tanggal</th><th>Aksi</th></tr>
         <?php while ($row = $result->fetchArray()): ?>
         <tr>
             <td><?= $row['id'] ?></td>
@@ -561,36 +550,28 @@ install_crud() {
             <td><?= $row['created_at'] ?></td>
             <td>
                 <a href="?edit=<?= $row['id'] ?>" class="edit-btn">✏️ Edit</a>
-                <a href="?delete=<?= $row['id'] ?>" class="delete-btn" onclick="return confirm('Yakin hapus data ini?')">🗑️ Hapus</a>
+                <a href="?delete=<?= $row['id'] ?>" class="delete-btn" onclick="return confirm('Yakin hapus?')">🗑️ Hapus</a>
             </td>
         </tr>
         <?php endwhile; ?>
     </table>
     
-    <?php if (isset($_GET['edit'])): 
-        $id = (int)$_GET['edit'];
-        $edit_result = $db->query("SELECT * FROM items WHERE id=$id");
-        $edit_row = $edit_result->fetchArray();
-        if ($edit_row):
-    ?>
+    <?php if (isset($_GET['edit'])): $id=(int)$_GET['edit']; $edit=$db->query("SELECT * FROM items WHERE id=$id")->fetchArray(); if($edit): ?>
     <div class="edit-form">
-        <h3>✏️ Edit Data ID: <?= $edit_row['id'] ?></h3>
+        <h3>✏️ Edit Data ID: <?= $edit['id'] ?></h3>
         <form method="post" style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 15px;">
-            <input type="hidden" name="id" value="<?= $edit_row['id'] ?>">
-            <input type="text" name="name" value="<?= htmlspecialchars($edit_row['name']) ?>" required style="flex:2; padding: 10px; border-radius: 8px; border: 1px solid #ddd;">
-            <input type="text" name="description" value="<?= htmlspecialchars($edit_row['description']) ?>" style="flex:3; padding: 10px; border-radius: 8px; border: 1px solid #ddd;">
-            <input type="text" name="category" value="<?= htmlspecialchars($edit_row['category']) ?>" style="flex:1; padding: 10px; border-radius: 8px; border: 1px solid #ddd;">
-            <input type="number" name="price" value="<?= $edit_row['price'] ?>" style="flex:1; padding: 10px; border-radius: 8px; border: 1px solid #ddd;">
-            <button type="submit" name="update" style="background: #28a745;">💾 Update</button>
-            <a href="?" style="background: #6c757d; color: white; padding: 10px 20px; border-radius: 8px; text-decoration: none;">Batal</a>
+            <input type="hidden" name="id" value="<?= $edit['id'] ?>">
+            <input type="text" name="name" value="<?= htmlspecialchars($edit['name']) ?>" required>
+            <input type="text" name="description" value="<?= htmlspecialchars($edit['description']) ?>">
+            <input type="text" name="category" value="<?= htmlspecialchars($edit['category']) ?>">
+            <input type="number" name="price" value="<?= $edit['price'] ?>">
+            <button type="submit" name="update" style="background:#28a745;">💾 Update</button>
+            <a href="?" style="background:#6c757d; color:white; padding:10px 20px; border-radius:5px; text-decoration:none;">Batal</a>
         </form>
     </div>
     <?php endif; endif; ?>
     
-    <div class="footer">
-        FahTech CRUD Application | Total Data: <?= $db->querySingle("SELECT COUNT(*) FROM items") ?> | 
-        <a href="https://github.com/fahriakb/fahtech-installer" style="color: #667eea;">FahTech Installer v8.0</a>
-    </div>
+    <div class="footer">FahTech CRUD Application | Total Data: <?= $db->querySingle("SELECT COUNT(*) FROM items") ?></div>
 </div>
 </body>
 </html>
@@ -603,12 +584,12 @@ EOF
     
     echo -e "\n${GREEN}✅ CRUD WEB LENGKAP BERHASIL!${NC}"
     echo -e "${GREEN}   🔗 Akses: http://$SERVER_IP/crud/${NC}"
-    echo -e "${GREEN}   📌 Fitur: ✨ Tambah Data | ✏️ Edit Data | 🗑️ Hapus Data | 🔍 Cari Data${NC}"
+    echo -e "${GREEN}   📌 Fitur: ✨ Tambah | ✏️ Edit | 🗑️ Hapus | 🔍 Cari${NC}"
     echo -e "\n${YELLOW}Tekan Enter...${NC}"
     read
 }
 
-# ======================= 9. WEBMAIL (ROUNDCUBE) =======================
+# ======================= 9. WEBMAIL (LENGKAP DENGAN TUTORIAL) =======================
 install_webmail() {
     clear
     echo -e "${GREEN}╔══════════════════════════════════════════════════════════════════╗${NC}"
@@ -621,12 +602,18 @@ install_webmail() {
         MAIN_DOMAIN=$(cat /etc/maildomain.conf)
         DNS_IP=$(cat /etc/mailip.conf)
         EMAIL_USER=$(cat /etc/mailuser.conf 2>/dev/null)
-        echo -e "\n${GREEN}✅ Domain terdeteksi: $MAIN_DOMAIN${NC}"
+        EMAIL_PASS=$(cat /etc/mailpass.conf 2>/dev/null)
+        echo -e "\n${GREEN}✅ Mendeteksi konfigurasi Mail Server:${NC}"
+        echo -e "   📝 Domain: $MAIN_DOMAIN"
+        echo -e "   🌐 IP: $DNS_IP"
+        echo -e "   👤 User: $EMAIL_USER@$MAIN_DOMAIN"
     else
-        echo -e "\n${CYAN}📝 Masukkan domain utama:${NC}"
+        echo -e "\n${CYAN}📝 Masukkan domain utama (contoh: fahrinih.net):${NC}"
         read -p "Domain: " MAIN_DOMAIN
         DNS_IP=$(hostname -I | awk '{print $1}')
         EMAIL_USER="admin"
+        EMAIL_PASS="admin123"
+        echo -e "${YELLOW}⚠️ Menggunakan default: admin@$MAIN_DOMAIN / admin123${NC}"
     fi
     
     # Cek mail server
@@ -638,6 +625,7 @@ install_webmail() {
     fi
     
     echo -e "\n${CYAN}📦 Menginstall Roundcube Webmail...${NC}"
+    echo -e "${YELLOW}   ⏳ Proses ini memakan waktu 2-3 menit...${NC}"
     
     apt install roundcube roundcube-mysql roundcube-plugins roundcube-core php-mysql dbconfig-common -y -qq
     
@@ -675,36 +663,54 @@ EOF
     systemctl restart apache2
     systemctl restart postfix dovecot
     
-    WEBMAIL_URL="http://$DNS_IP/roundcube/"
+    WEBMAIL_URL_IP="http://$DNS_IP/roundcube/"
+    WEBMAIL_URL_DOMAIN="http://mail.$MAIN_DOMAIN/roundcube/"
     
-    echo -e "\n${GREEN}╔════════════════════════════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${GREEN}║   ✅ WEBMAIL (ROUNDCUBE) BERHASIL DIINSTALL!                                    ║${NC}"
-    echo -e "${GREEN}╠════════════════════════════════════════════════════════════════════════════════╣${NC}"
-    echo -e "${GREEN}║                                                                                ║${NC}"
-    echo -e "${GREEN}║   🌐 AKSES WEBMAIL:                                                           ║${NC}"
-    echo -e "${GREEN}║      👉 $WEBMAIL_URL${NC}"
-    echo -e "${GREEN}║                                                                                ║${NC}"
-    echo -e "${GREEN}║   📝 LOGIN DENGAN:                                                            ║${NC}"
-    echo -e "${GREEN}║      👤 Username: $EMAIL_USER@$MAIN_DOMAIN                                    ║${NC}"
-    echo -e "${GREEN}║      🔑 Password: [password yang kamu buat saat install mail server]           ║${NC}"
-    echo -e "${GREEN}║                                                                                ║${NC}"
-    echo -e "${GREEN}║   💡 CARA MENCOBA KIRIM EMAIL:                                                 ║${NC}"
-    echo -e "${GREEN}║      1. Login ke webmail di atas                                              ║${NC}"
-    echo -e "${GREEN}║      2. Klik tombol \"Compose\" atau \"Tulis Email\"                            ║${NC}"
-    echo -e "${GREEN}║      3. Isi tujuan: $EMAIL_USER@$MAIN_DOMAIN (atau user lain)                ║${NC}"
-    echo -e "${GREEN}║      4. Tulis subjek dan pesan                                               ║${NC}"
-    echo -e "${GREEN}║      5. Klik \"Send\" - Email akan terkirim!                                  ║${NC}"
-    echo -e "${GREEN}║                                                                                ║${NC}"
-    echo -e "${GREEN}║   📌 CATATAN:                                                                 ║${NC}"
-    echo -e "${GREEN}║      - Kirim email ke sesama user lokal pasti berhasil                        ║${NC}"
-    echo -e "${GREEN}║      - Kirim ke email luar (Gmail/Yahoo) perlu konfigurasi DNS tambahan      ║${NC}"
-    echo -e "${GREEN}╚════════════════════════════════════════════════════════════════════════════════╝${NC}"
+    echo -e "\n${GREEN}╔════════════════════════════════════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${GREEN}║   ✅ WEBMAIL (ROUNDCUBE) BERHASIL DIINSTALL!                                                 ║${NC}"
+    echo -e "${GREEN}╠════════════════════════════════════════════════════════════════════════════════════════════╣${NC}"
+    echo -e "${GREEN}║                                                                                            ║${NC}"
+    echo -e "${GREEN}║   🌐 AKSES WEBMAIL VIA IP:                                                                 ║${NC}"
+    echo -e "${GREEN}║      👉 ${WEBMAIL_URL_IP}${NC}"
+    echo -e "${GREEN}║                                                                                            ║${NC}"
+    echo -e "${GREEN}║   📝 LOGIN MENGGUNAKAN:                                                                    ║${NC}"
+    echo -e "${GREEN}║      👤 Username: $EMAIL_USER@$MAIN_DOMAIN                                                ║${NC}"
+    echo -e "${GREEN}║      🔑 Password: $EMAIL_PASS                                                              ║${NC}"
+    echo -e "${GREEN}║                                                                                            ║${NC}"
+    echo -e "${GREEN}║   ┌────────────────────────────────────────────────────────────────────────────────────┐   ║${NC}"
+    echo -e "${GREEN}║   │  📌 Cara Mengirim Email:                                                           │   ║${NC}"
+    echo -e "${GREEN}║   │     1. Buka link webmail di atas                                                   │   ║${NC}"
+    echo -e "${GREEN}║   │     2. Login dengan username dan password di atas                                 │   ║${NC}"
+    echo -e "${GREEN}║   │     3. Klik tombol \"Compose\" atau \"Tulis Email\"                                  │   ║${NC}"
+    echo -e "${GREEN}║   │     4. Isi Kolom:                                                                 │   ║${NC}"
+    echo -e "${GREEN}║   │        - To (Tujuan): $EMAIL_USER@$MAIN_DOMAIN (atau email lain)                  │   ║${NC}"
+    echo -e "${GREEN}║   │        - Subject (Subjek): Tes Kirim Email                                        │   ║${NC}"
+    echo -e "${GREEN}║   │        - Message (Pesan): Halo, ini tes email dari server FahTech!                │   ║${NC}"
+    echo -e "${GREEN}║   │     5. Klik \"Send\" (Kirim)                                                        │   ║${NC}"
+    echo -e "${GREEN}║   │     6. Email akan masuk ke inbox! ✅                                               │   ║${NC}"
+    echo -e "${GREEN}║   └────────────────────────────────────────────────────────────────────────────────────┘   ║${NC}"
+    echo -e "${GREEN}║                                                                                            ║${NC}"
+    echo -e "${GREEN}║   ┌────────────────────────────────────────────────────────────────────────────────────┐   ║${NC}"
+    echo -e "${GREEN}║   │  🌐 Agar Bisa Akses Pakai Domain (mail.domain.com):                               │   ║${NC}"
+    echo -e "${GREEN}║   │                                                                                   │   ║${NC}"
+    echo -e "${GREEN}║   │     📌 Windows:                                                                   │   ║${NC}"
+    echo -e "${GREEN}║   │        Buka: C:\\Windows\\System32\\drivers\\etc\\hosts (Run as Administrator)        │   ║${NC}"
+    echo -e "${GREEN}║   │        Tambahkan baris: $DNS_IP mail.$MAIN_DOMAIN                                 │   ║${NC}"
+    echo -e "${GREEN}║   │                                                                                   │   ║${NC}"
+    echo -e "${GREEN}║   │     📌 Linux/Mac:                                                                 │   ║${NC}"
+    echo -e "${GREEN}║   │        sudo nano /etc/hosts                                                       │   ║${NC}"
+    echo -e "${GREEN}║   │        Tambahkan baris: $DNS_IP mail.$MAIN_DOMAIN                                 │   ║${NC}"
+    echo -e "${GREEN}║   │                                                                                   │   ║${NC}"
+    echo -e "${GREEN}║   │     ✅ Setelah itu akses: ${WEBMAIL_URL_DOMAIN}${NC}"
+    echo -e "${GREEN}║   └────────────────────────────────────────────────────────────────────────────────────┘   ║${NC}"
+    echo -e "${GREEN}║                                                                                            ║${NC}"
+    echo -e "${GREEN}╚════════════════════════════════════════════════════════════════════════════════════════════╝${NC}"
     
     echo -e "\n${YELLOW}Tekan Enter untuk kembali ke menu...${NC}"
     read
 }
 
-# ======================= 10. INSTALL SEMUA LENGKAP =======================
+# ======================= 10. INSTALL SEMUA =======================
 install_all() {
     clear
     echo -e "${GREEN}╔════════════════════════════════════════════════════════════╗${NC}"
@@ -729,31 +735,26 @@ install_all() {
         DNS_IP=$(cat /etc/mailip.conf 2>/dev/null || hostname -I | awk '{print $1}')
         MAIN_DOMAIN=$(cat /etc/maildomain.conf 2>/dev/null || echo "domain-anda.com")
         EMAIL_USER=$(cat /etc/mailuser.conf 2>/dev/null || echo "admin")
+        EMAIL_PASS=$(cat /etc/mailpass.conf 2>/dev/null || echo "admin123")
         
-        echo -e "\n${GREEN}╔════════════════════════════════════════════════════════════════════════════════╗${NC}"
-        echo -e "${GREEN}║   🎉 SELAMAT! SEMUA SERVICE BERHASIL DIINSTALL! 🎉                             ║${NC}"
-        echo -e "${GREEN}╠════════════════════════════════════════════════════════════════════════════════╣${NC}"
-        echo -e "${GREEN}║                                                                                ║${NC}"
-        echo -e "${GREEN}║   🌐 LANDING PAGE:    http://$DNS_IP                                           ║${NC}"
-        echo -e "${GREEN}║   📧 WEBMAIL:         http://$DNS_IP/roundcube/                               ║${NC}"
-        echo -e "${GREEN}║   📝 WORDPRESS:       http://$DNS_IP/wp-admin                                 ║${NC}"
-        echo -e "${GREEN}║   🗄️  CRUD:           http://$DNS_IP/crud/                                    ║${NC}"
-        echo -e "${GREEN}║                                                                                ║${NC}"
-        echo -e "${GREEN}║   📧 LOGIN WEBMAIL:                                                            ║${NC}"
-        echo -e "${GREEN}║      👤 Username: $EMAIL_USER@$MAIN_DOMAIN                                    ║${NC}"
-        echo -e "${GREEN}║      🔑 Password: [password yang sudah dibuat]                                ║${NC}"
-        echo -e "${GREEN}║                                                                                ║${NC}"
-        echo -e "${GREEN}║   🗄️  CRUD FITUR LENGKAP:                                                      ║${NC}"
-        echo -e "${GREEN}║      ✨ Tambah Data | ✏️ Edit Data | 🗑️ Hapus Data | 🔍 Cari Data             ║${NC}"
-        echo -e "${GREEN}║                                                                                ║${NC}"
-        echo -e "${GREEN}║   📌 CARA AKSES PAKAI DOMAIN:                                                  ║${NC}"
-        echo -e "${GREEN}║      Tambahkan ke file hosts:                                                 ║${NC}"
-        echo -e "${GREEN}║      Windows: C:\\Windows\\System32\\drivers\\etc\\hosts                        ║${NC}"
-        echo -e "${GREEN}║      Linux/Mac: /etc/hosts                                                    ║${NC}"
-        echo -e "${GREEN}║      Isi: $DNS_IP mail.$MAIN_DOMAIN                                           ║${NC}"
-        echo -e "${GREEN}║      Lalu akses: http://mail.$MAIN_DOMAIN/roundcube/                         ║${NC}"
-        echo -e "${GREEN}║                                                                                ║${NC}"
-        echo -e "${GREEN}╚════════════════════════════════════════════════════════════════════════════════╝${NC}"
+        echo -e "\n${GREEN}╔════════════════════════════════════════════════════════════════════════════════════════════╗${NC}"
+        echo -e "${GREEN}║   🎉 SELAMAT! SEMUA SERVICE BERHASIL DIINSTALL! 🎉                                         ║${NC}"
+        echo -e "${GREEN}╠════════════════════════════════════════════════════════════════════════════════════════════╣${NC}"
+        echo -e "${GREEN}║                                                                                            ║${NC}"
+        echo -e "${GREEN}║   🌐 LANDING PAGE:    http://$DNS_IP                                                       ║${NC}"
+        echo -e "${GREEN}║   📧 WEBMAIL:         http://$DNS_IP/roundcube/                                           ║${NC}"
+        echo -e "${GREEN}║   📝 WORDPRESS:       http://$DNS_IP/wp-admin                                             ║${NC}"
+        echo -e "${GREEN}║   🗄️  CRUD:           http://$DNS_IP/crud/                                                ║${NC}"
+        echo -e "${GREEN}║                                                                                            ║${NC}"
+        echo -e "${GREEN}║   📧 LOGIN WEBMAIL:                                                                       ║${NC}"
+        echo -e "${GREEN}║      👤 Username: $EMAIL_USER@$MAIN_DOMAIN                                                ║${NC}"
+        echo -e "${GREEN}║      🔑 Password: $EMAIL_PASS                                                              ║${NC}"
+        echo -e "${GREEN}║                                                                                            ║${NC}"
+        echo -e "${GREEN}║   📌 Agar bisa akses pakai domain (mail.$MAIN_DOMAIN):                                    ║${NC}"
+        echo -e "${GREEN}║      Tambahkan ke file hosts: $DNS_IP mail.$MAIN_DOMAIN                                   ║${NC}"
+        echo -e "${GREEN}║      Lalu akses: http://mail.$MAIN_DOMAIN/roundcube/                                      ║${NC}"
+        echo -e "${GREEN}║                                                                                            ║${NC}"
+        echo -e "${GREEN}╚════════════════════════════════════════════════════════════════════════════════════════════╝${NC}"
     fi
     
     echo -e "\n${YELLOW}Tekan Enter untuk kembali...${NC}"
@@ -765,8 +766,8 @@ while true; do
     clear
     echo -e "${CYAN}"
     echo "╔══════════════════════════════════════════════════════════════════╗"
-    echo "║            🚀 FAHTECH MULTI-SERVICE INSTALLER v8.0              ║"
-    echo "║         CRUD LENGKAP + MAIL SERVER + WEBMAIL                     ║"
+    echo "║            🚀 FAHTECH MULTI-SERVICE INSTALLER v9.0              ║"
+    echo "║         MAIL SERVER + WEBMAIL + CRUD LENGKAP                     ║"
     echo "╠══════════════════════════════════════════════════════════════════╣"
     echo "║                                                                  ║"
     echo "║  1.  ⚡ INSTALL SEMUA SERVICE LENGKAP (15-20 menit)              ║"
