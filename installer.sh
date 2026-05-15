@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # ============================================================
-#   FAHTECH - MULTI-SERVICE INSTALLER PRO v13.0
-#   13 KONFIGURASI LENGKAP | TAMPILAN PROFESIONAL
+#   FAHTECH - MULTI-SERVICE INSTALLER PRO v14.0
+#   14 KONFIGURASI LENGKAP | HAPUS SEMUA FOLDER
 # ============================================================
 
 RED='\033[0;31m'
@@ -26,7 +26,7 @@ echo "║   ██║     ██║  ██║██║  ██║   ██║  
 echo "║   ╚═╝     ╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝   ╚══════╝ ╚═════╝╚═╝  ╚═╝                 ║"
 echo "║                                                                              ║"
 echo "║                   MULTI-SERVICE INSTALLER PROFESSIONAL                       ║"
-echo "║                   13 KONFIGURASI | TAMPILAN KEREN                            ║"
+echo "║                   14 KONFIGURASI | HAPUS SEMUA FOLDER                        ║"
 echo "╚══════════════════════════════════════════════════════════════════════════════╝"
 echo -e "${NC}"
 
@@ -79,6 +79,7 @@ install_dhcp() {
         RANGE_START=$(echo $SELECTED_IP | cut -d. -f1-3).100
         RANGE_END=$(echo $SELECTED_IP | cut -d. -f1-3).200
         
+        apt update -qq
         apt install -y isc-dhcp-server
         echo "INTERFACESv4=\"$SELECTED_IFACE\"" > /etc/default/isc-dhcp-server
         cat > /etc/dhcp/dhcpd.conf <<EOF
@@ -92,11 +93,13 @@ EOF
         systemctl enable isc-dhcp-server
         echo -e "\n${GREEN}✅ DHCP BERHASIL! Interface: $SELECTED_IFACE${NC}"
         echo -e "${GREEN}   Subnet: $SUBNET/24 | Range: $RANGE_START - $RANGE_END${NC}"
+    else
+        echo -e "${RED}❌ Pilihan tidak valid!${NC}"
     fi
     read -p "Tekan Enter..."
 }
 
-# ======================= 2. DNS SERVER (1 DNS saja) =======================
+# ======================= 2. DNS SERVER (1 DOMAIN) =======================
 install_dns_single() {
     clear
     echo -e "${BLUE}╔════════════════════════════════════════════════╗${NC}"
@@ -113,6 +116,7 @@ install_dns_single() {
         echo -e "\n${MAGENTA}📝 Masukkan nama domain (contoh: fahtech.com):${NC}"
         read -p "Domain: " DOMAIN
         
+        apt update -qq
         apt install -y bind9 bind9utils
         
         cat > /etc/bind/named.conf.local <<EOF
@@ -136,11 +140,13 @@ EOF
         systemctl enable bind9
         
         echo -e "\n${GREEN}✅ DNS BERHASIL! Domain: $DOMAIN -> $IP${NC}"
+    else
+        echo -e "${RED}❌ Pilihan tidak valid!${NC}"
     fi
     read -p "Tekan Enter..."
 }
 
-# ======================= 3. DNS SERVER (3 TAMPILAN BERBEDA) =======================
+# ======================= 3. DNS SERVER (3 TAMPILAN) =======================
 install_dns_three() {
     clear
     echo -e "${MAGENTA}╔══════════════════════════════════════════════════════════════════╗${NC}"
@@ -148,11 +154,11 @@ install_dns_three() {
     echo -e "${MAGENTA}║           1. Tutorial DHCP | 2. Tutorial CRUD | 3. Tutorial Apache2 ║${NC}"
     echo -e "${MAGENTA}╚══════════════════════════════════════════════════════════════════╝${NC}"
     
-    echo -e "\n${YELLOW}Pilih jenis DNS Server:${NC}"
-    echo -e "  ${GREEN}1.${NC} DNS dengan Tutorial DHCP"
-    echo -e "  ${GREEN}2.${NC} DNS dengan Tutorial CRUD"
-    echo -e "  ${GREEN}3.${NC} DNS dengan Tutorial Apache2"
-    read -p "Pilih [1-3]: " dns_choice
+    echo -e "\n${YELLOW}Pilih jenis tutorial:${NC}"
+    echo -e "  ${GREEN}1.${NC} Tutorial DHCP Server"
+    echo -e "  ${GREEN}2.${NC} Tutorial CRUD Siswa"
+    echo -e "  ${GREEN}3.${NC} Tutorial Apache2 Web Server"
+    read -p "Pilih [1-3]: " tutorial_choice
     
     show_interfaces
     echo -e "\n${YELLOW}👉 Pilih interface untuk DNS Server:${NC}"
@@ -163,6 +169,7 @@ install_dns_three() {
         echo -e "\n${MAGENTA}📝 Masukkan nama domain (contoh: tutorial.fahtech.com):${NC}"
         read -p "Domain: " DOMAIN
         
+        apt update -qq
         apt install -y bind9 bind9utils
         
         cat > /etc/bind/named.conf.local <<EOF
@@ -187,8 +194,9 @@ EOF
         echo -e "\n${GREEN}✅ DNS BERHASIL! Domain: $DOMAIN -> $IP${NC}"
         
         # Tampilkan tutorial sesuai pilihan
-        if [[ $dns_choice -eq 1 ]]; then
-            echo -e "\n${CYAN}════════════════════════════════════════════════════════════════════${NC}"
+        echo -e "\n${CYAN}════════════════════════════════════════════════════════════════════${NC}"
+        
+        if [[ $tutorial_choice -eq 1 ]]; then
             echo -e "${CYAN}           📖 TUTORIAL DHCP SERVER LENGKAP${NC}"
             echo -e "${CYAN}════════════════════════════════════════════════════════════════════${NC}"
             echo -e ""
@@ -210,8 +218,11 @@ EOF
             echo -e "📌 LANGKAH 4: START DHCP SERVER"
             echo -e "   sudo systemctl restart isc-dhcp-server"
             echo -e "   sudo systemctl enable isc-dhcp-server"
-        elif [[ $dns_choice -eq 2 ]]; then
-            echo -e "\n${CYAN}════════════════════════════════════════════════════════════════════${NC}"
+            echo -e ""
+            echo -e "📌 LANGKAH 5: CEK STATUS"
+            echo -e "   sudo systemctl status isc-dhcp-server"
+            echo -e "   sudo cat /var/lib/dhcp/dhcpd.leases"
+        elif [[ $tutorial_choice -eq 2 ]]; then
             echo -e "${CYAN}           📖 TUTORIAL CRUD SISWA LENGKAP${NC}"
             echo -e "${CYAN}════════════════════════════════════════════════════════════════════${NC}"
             echo -e ""
@@ -231,7 +242,6 @@ EOF
             echo -e "📌 LANGKAH 4: AKSES CRUD"
             echo -e "   Buka browser: http://$IP/crud/"
         else
-            echo -e "\n${CYAN}════════════════════════════════════════════════════════════════════${NC}"
             echo -e "${CYAN}           📖 TUTORIAL APACHE2 WEB SERVER LENGKAP${NC}"
             echo -e "${CYAN}════════════════════════════════════════════════════════════════════${NC}"
             echo -e ""
@@ -240,15 +250,23 @@ EOF
             echo -e ""
             echo -e "📌 LANGKAH 2: KONFIGURASI VIRTUAL HOST"
             echo -e "   sudo nano /etc/apache2/sites-available/$DOMAIN.conf"
+            echo -e "   <VirtualHost *:80>"
+            echo -e "       ServerName $DOMAIN"
+            echo -e "       ServerAlias www.$DOMAIN"
+            echo -e "       DocumentRoot /var/www/html/$DOMAIN"
+            echo -e "   </VirtualHost>"
             echo -e ""
             echo -e "📌 LANGKAH 3: AKTIFKAN SITE"
             echo -e "   sudo a2ensite $DOMAIN.conf"
+            echo -e "   sudo a2dissite 000-default.conf"
             echo -e "   sudo systemctl reload apache2"
             echo -e ""
             echo -e "📌 LANGKAH 4: AKSES WEBSITE"
             echo -e "   Buka browser: http://$IP"
         fi
         echo -e "${CYAN}════════════════════════════════════════════════════════════════════${NC}"
+    else
+        echo -e "${RED}❌ Pilihan tidak valid!${NC}"
     fi
     read -p "Tekan Enter..."
 }
@@ -261,6 +279,7 @@ install_apache2() {
     echo -e "${GREEN}║           + LANDING PAGE KEREN                 ║${NC}"
     echo -e "${GREEN}╚════════════════════════════════════════════════╝${NC}"
     
+    apt update -qq
     apt install -y apache2 php libapache2-mod-php
     
     cat > /var/www/html/index.html <<'EOF'
@@ -283,7 +302,7 @@ h1{color:white;font-size:48px}
 <div class="service">🌐 Web</div><div class="service">📧 Mail</div>
 <div class="service">📝 WP</div><div class="service">🗄️ CRUD</div><div class="service">🌍 Webmail</div>
 </div>
-<p style="color:white;">Powered by FahTech Installer v13.0</p>
+<p style="color:white;">Powered by FahTech Installer v14.0</p>
 </body>
 </html>
 EOF
@@ -300,12 +319,13 @@ install_ftp() {
     echo -e "${GREEN}║              📁 INSTALL FTP SERVER             ║${NC}"
     echo -e "${GREEN}╚════════════════════════════════════════════════╝${NC}"
     
+    apt update -qq
     apt install -y vsftpd
     systemctl restart vsftpd
     systemctl enable vsftpd
     
     echo -e "\n${GREEN}✅ FTP BERHASIL! Akses: ftp://$SERVER_IP${NC}"
-    echo -e "${YELLOW}   📌 Login pakai user Linux (contoh: root, fahri)${NC}"
+    echo -e "${YELLOW}   📌 Login pakai user Linux (contoh: root)${NC}"
     read -p "Tekan Enter..."
 }
 
@@ -319,6 +339,7 @@ install_samba() {
     read -p "📝 Nama Share (Enter untuk 'public'): " share_name
     share_name=${share_name:-public}
     
+    apt update -qq
     apt install -y samba
     mkdir -p /home/share
     chmod 777 /home/share
@@ -368,6 +389,7 @@ install_mail() {
     hostnamectl set-hostname $MAIL_DOMAIN
     echo "$MAIL_IP $MAIL_DOMAIN" >> /etc/hosts
     
+    apt update -qq
     apt install -y postfix dovecot-core dovecot-imapd dovecot-pop3d mailutils
     postconf -e "myhostname = $MAIL_DOMAIN"
     postconf -e "mydomain = $MAIN_DOMAIN"
@@ -381,11 +403,28 @@ install_mail() {
     rm -rf /etc/dovecot 2>/dev/null
     cat > /etc/dovecot/dovecot.conf <<EOF
 disable_plaintext_auth = no
+mail_privileged_group = mail
 mail_location = maildir:~/Maildir
-passdb { driver = passwd-file args = scheme=PLAIN /etc/dovecot/users }
-userdb { driver = passwd }
+
+passdb {
+  driver = passwd-file
+  args = scheme=PLAIN /etc/dovecot/users
+}
+
+userdb {
+  driver = passwd
+}
+
 protocols = imap pop3
-service auth { unix_listener /var/spool/postfix/private/auth { mode = 0660 user = postfix group = postfix } }
+
+service auth {
+  unix_listener /var/spool/postfix/private/auth {
+    mode = 0660
+    user = postfix
+    group = postfix
+  }
+}
+
 ssl = no
 EOF
     
@@ -400,6 +439,11 @@ EOF
     systemctl restart postfix dovecot
     systemctl enable postfix dovecot
     
+    echo "$MAIN_DOMAIN" > /etc/maildomain.conf
+    echo "$MAIL_IP" > /etc/mailip.conf
+    echo "$EMAIL_USER" > /etc/mailuser.conf
+    echo "$EMAIL_PASS" > /etc/mailpass.conf
+    
     echo -e "\n${GREEN}✅ MAIL SERVER BERHASIL! $EMAIL_USER@$MAIN_DOMAIN / $EMAIL_PASS${NC}"
     read -p "Tekan Enter..."
 }
@@ -411,6 +455,7 @@ install_wordpress() {
     echo -e "${GREEN}║              📝 INSTALL WORDPRESS              ║${NC}"
     echo -e "${GREEN}╚════════════════════════════════════════════════╝${NC}"
     
+    apt update -qq
     apt install -y mariadb-server
     systemctl restart mariadb
     
@@ -449,6 +494,7 @@ install_crud() {
     echo -e "${GREEN}║   (Nama + Rombel + NIS) - Tambah/Edit/Hapus/Cari ║${NC}"
     echo -e "${GREEN}╚════════════════════════════════════════════════╝${NC}"
     
+    apt update -qq
     apt install -y php-sqlite3
     mkdir -p /var/www/html/crud
     
@@ -487,7 +533,8 @@ $res=$db->query("SELECT * FROM siswa");
 <button type="submit" name="add">Tambah</button>
 </form>
 <h3>Daftar Siswa</h3>
-<table><tr><th>Nama</th><th>Rombel</th><th>NIS</th><th>Aksi</th></tr>
+<table border="1" cellpadding="10" cellspacing="0" width="100%">
+<tr><th>Nama</th><th>Rombel</th><th>NIS</th><th>Aksi</th></tr>
 <?php while($row=$res->fetchArray()){echo "<tr><td>".$row['nama']."</td><td>".$row['rombel']."</td><td>".$row['nis']."</td><td><a class='edit-btn' href='?edit=".$row['id']."'>Edit</a> <a class='delete-btn' href='?delete=".$row['id']."'>Hapus</a></td></tr>";}?>
 </table>
 <?php if(isset($_GET['edit'])){$id=(int)$_GET['edit'];$edit=$db->query("SELECT * FROM siswa WHERE id=$id")->fetchArray();if($edit){?>
@@ -525,9 +572,10 @@ install_webmail() {
         return
     fi
     
+    apt update -qq
     apt remove --purge -y roundcube* php-roundcube* dbconfig-common 2>/dev/null
     rm -rf /etc/roundcube /var/lib/roundcube /usr/share/roundcube
-    apt install -y roundcube roundcube-mysql roundcube-core php-mysql
+    apt install -y roundcube roundcube-mysql roundcube-core php-mysql dbconfig-common
     
     mysql -u root <<MYSQL 2>/dev/null
 DROP DATABASE IF EXISTS roundcubemail;
@@ -545,7 +593,12 @@ PHP
     
     cat > /etc/apache2/conf-available/roundcube.conf <<APACHE
 Alias /roundcube /usr/share/roundcube
-<Directory /usr/share/roundcube/> Options +FollowSymLinks AllowOverride All Require all granted </Directory>
+Alias /webmail /usr/share/roundcube
+<Directory /usr/share/roundcube/>
+    Options +FollowSymLinks
+    AllowOverride All
+    Require all granted
+</Directory>
 APACHE
     
     a2enconf roundcube
@@ -567,7 +620,6 @@ install_all() {
     echo -e "\n${YELLOW}⚠️ Proses akan memakan waktu 15-20 menit. Lanjutkan? (y/n):${NC}"
     read confirm
     if [[ "$confirm" == "y" ]]; then
-        apt update -qq
         install_apache2
         install_dhcp
         install_ftp
@@ -608,26 +660,94 @@ uninstall_service() {
     echo -e "  ${GREEN}7.${NC} Hapus WordPress"
     echo -e "  ${GREEN}8.${NC} Hapus CRUD"
     echo -e "  ${GREEN}9.${NC} Hapus Webmail"
-    echo -e "  ${GREEN}10.${NC} Hapus SEMUA Service"
+    echo -e "  ${GREEN}10.${NC} Hapus SEMUA Service + Folder"
     read -p "Pilih [1-10]: " uninstall_choice
     
     case $uninstall_choice in
-        1) apt remove --purge -y isc-dhcp-server; rm -rf /etc/dhcp; echo "✅ DHCP dihapus!" ;;
-        2) apt remove --purge -y bind9 bind9utils; rm -rf /etc/bind; echo "✅ DNS dihapus!" ;;
-        3) apt remove --purge -y apache2; rm -rf /var/www/html; echo "✅ Apache2 dihapus!" ;;
-        4) apt remove --purge -y vsftpd; echo "✅ FTP dihapus!" ;;
-        5) apt remove --purge -y samba; rm -rf /home/share; echo "✅ Samba dihapus!" ;;
-        6) apt remove --purge -y postfix dovecot-core; rm -rf /etc/postfix /etc/dovecot; echo "✅ Mail Server dihapus!" ;;
-        7) rm -rf /var/www/html/wp-*; mysql -u root -e "DROP DATABASE IF EXISTS wordpress;"; echo "✅ WordPress dihapus!" ;;
-        8) rm -rf /var/www/html/crud; echo "✅ CRUD dihapus!" ;;
-        9) apt remove --purge -y roundcube*; rm -rf /etc/roundcube /var/lib/roundcube; mysql -u root -e "DROP DATABASE IF EXISTS roundcubemail;"; echo "✅ Webmail dihapus!" ;;
-        10) 
-            apt remove --purge -y isc-dhcp-server bind9 apache2 vsftpd samba postfix dovecot* roundcube*
-            rm -rf /etc/dhcp /etc/bind /var/www/html /etc/postfix /etc/dovecot /home/share /etc/roundcube
-            mysql -u root -e "DROP DATABASE IF EXISTS wordpress; DROP DATABASE IF EXISTS roundcubemail;"
-            echo "✅ SEMUA SERVICE DIHAPUS!"
+        1) 
+            apt remove --purge -y isc-dhcp-server
+            rm -rf /etc/dhcp /var/lib/dhcp
+            echo "✅ DHCP dihapus!"
             ;;
-        *) echo "❌ Pilihan salah!" ;;
+        2) 
+            apt remove --purge -y bind9 bind9utils
+            rm -rf /etc/bind /var/lib/bind
+            echo "✅ DNS dihapus!"
+            ;;
+        3) 
+            apt remove --purge -y apache2 apache2-bin apache2-data
+            rm -rf /etc/apache2 /var/www/html
+            echo "✅ Apache2 dihapus!"
+            ;;
+        4) 
+            apt remove --purge -y vsftpd
+            rm -rf /etc/vsftpd.conf
+            echo "✅ FTP dihapus!"
+            ;;
+        5) 
+            apt remove --purge -y samba samba-common
+            rm -rf /etc/samba /home/share /var/lib/samba
+            echo "✅ Samba dihapus!"
+            ;;
+        6) 
+            apt remove --purge -y postfix dovecot-core dovecot-imapd dovecot-pop3d mailutils
+            rm -rf /etc/postfix /etc/dovecot /home/*/Maildir /var/mail
+            echo "✅ Mail Server dihapus!"
+            ;;
+        7) 
+            rm -rf /var/www/html/wp-* /var/www/html/wordpress
+            mysql -u root -e "DROP DATABASE IF EXISTS wordpress;" 2>/dev/null
+            mysql -u root -e "DROP USER IF EXISTS 'wpuser'@'localhost';" 2>/dev/null
+            echo "✅ WordPress dihapus!"
+            ;;
+        8) 
+            rm -rf /var/www/html/crud
+            echo "✅ CRUD dihapus!"
+            ;;
+        9) 
+            apt remove --purge -y roundcube* php-roundcube* dbconfig-common
+            rm -rf /etc/roundcube /var/lib/roundcube /usr/share/roundcube
+            mysql -u root -e "DROP DATABASE IF EXISTS roundcubemail;" 2>/dev/null
+            mysql -u root -e "DROP USER IF EXISTS 'roundcube'@'localhost';" 2>/dev/null
+            echo "✅ Webmail dihapus!"
+            ;;
+        10)
+            echo -e "${RED}🗑️ Menghapus SEMUA Service dan Folder...${NC}"
+            # Stop semua service
+            systemctl stop apache2 bind9 isc-dhcp-server postfix dovecot samba smbd vsftpd mariadb mysql 2>/dev/null
+            systemctl disable apache2 bind9 isc-dhcp-server postfix dovecot samba smbd vsftpd mariadb mysql 2>/dev/null
+            
+            # Hapus semua paket
+            apt remove --purge -y apache2* bind9* isc-dhcp-server* postfix* dovecot* samba* vsftpd* mariadb* mysql* roundcube* php* 2>/dev/null
+            
+            # Hapus semua folder
+            rm -rf /var/www/html /var/www/*
+            rm -rf /etc/apache2 /etc/bind /etc/dhcp /etc/postfix /etc/dovecot /etc/samba /etc/mysql /etc/roundcube
+            rm -rf /var/lib/mysql /var/lib/dhcp /var/lib/bind /var/lib/roundcube
+            rm -rf /var/log/apache2 /var/log/bind /var/log/mysql /var/log/postfix
+            rm -rf /home/share /home/*/Maildir
+            rm -rf /etc/dbconfig-common /var/lib/dbconfig-common
+            
+            # Hapus user
+            userdel -r admin 2>/dev/null
+            userdel -r ftpuser 2>/dev/null
+            userdel -r wpuser 2>/dev/null
+            
+            # Hapus database
+            rm -rf /var/lib/mysql
+            rm -rf /etc/mysql
+            
+            # Bersihkan
+            apt autoremove --purge -y
+            apt autoclean
+            apt clean
+            
+            echo -e "${GREEN}✅ SEMUA SERVICE DAN FOLDER BERHASIL DIHAPUS!${NC}"
+            echo -e "${GREEN}📁 Server sekarang bersih seperti baru pertama install.${NC}"
+            ;;
+        *)
+            echo -e "${RED}❌ Pilihan salah!${NC}"
+            ;;
     esac
     read -p "Tekan Enter..."
 }
@@ -724,14 +844,14 @@ check_status() {
     read -p "Tekan Enter..."
 }
 
-# ======================= MENU UTAMA =======================
+# ======================= 14. MENU UTAMA =======================
 while true; do
     clear
     echo -e "${CYAN}"
     echo "╔════════════════════════════════════════════════════════════════════════════╗"
     echo "║                                                                             ║"
-    echo "║            🚀 FAHTECH MULTI-SERVICE INSTALLER v13.0                        ║"
-    echo "║                    13 KONFIGURASI | TAMPILAN KEREN                          ║"
+    echo "║            🚀 FAHTECH MULTI-SERVICE INSTALLER v14.0                        ║"
+    echo "║                    14 KONFIGURASI | HAPUS SEMUA FOLDER                      ║"
     echo "║                                                                             ║"
     echo "╠════════════════════════════════════════════════════════════════════════════╣"
     echo "║                                                                             ║"
@@ -751,7 +871,7 @@ while true; do
     echo "║  ⚡ FITUR TAMBAHAN                                                         ║"
     echo "║  ───────────────────────────────────────────────────────────────────────── ║"
     echo "║    11. ⚡ Install SEMUA Service (Otomatis)                                  ║"
-    echo "║    12. 🗑️ Hapus Service                                                    ║"
+    echo "║    12. 🗑️ Hapus Service (Pilih per service atau hapus semua)              ║"
     echo "║    13. 📊 Cek Status Service                                               ║"
     echo "║    14. 🚪 Exit                                                             ║"
     echo "╚════════════════════════════════════════════════════════════════════════════╝"
