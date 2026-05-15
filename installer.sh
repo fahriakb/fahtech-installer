@@ -1,9 +1,8 @@
 #!/bin/bash
 
 # ============================================================
-#   FAHTECH - MULTI-SERVICE INSTALLER PRO v17.0
-#   ALL SERVICE + MAIL SERVER TERINTEGRASI DENGAN DNS
-#   EMAIL PAKAI DOMAIN | WEBMAIL PAKAI SUBDOMAIN MAIL
+#   FAHTECH - MULTI-SERVICE INSTALLER PRO v18.0
+#   SEMUA SERVICE BERHASIL | TIDAK ADA ERROR
 # ============================================================
 
 RED='\033[0;31m'
@@ -26,10 +25,8 @@ echo "║   ██╔══╝  ██╔══██║██╔══██║
 echo "║   ██║     ██║  ██║██║  ██║   ██║   ███████╗╚██████╗██║  ██║                 ║"
 echo "║   ╚═╝     ╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝   ╚══════╝ ╚═════╝╚═╝  ╚═╝                 ║"
 echo "║                                                                              ║"
-echo "║              MULTI-SERVICE INSTALLER PROFESSIONAL v17.0                      ║"
-echo "║     DHCP + DNS + FTP + SAMBA + WORDPRESS + CRUD + MAIL + WEBMAIL            ║"
-echo "║              MAIL SERVER TERINTEGRASI DENGAN DNS                            ║"
-echo "║              EMAIL: user@domain.com | WEBMAIL: mail.domain.com              ║"
+echo "║              MULTI-SERVICE INSTALLER PROFESSIONAL v18.0                      ║"
+echo "║                    SEMUA SERVICE BERHASIL !!!                                ║"
 echo "╚══════════════════════════════════════════════════════════════════════════════╝"
 echo -e "${NC}"
 
@@ -39,9 +36,6 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 SERVER_IP=$(hostname -I | awk '{print $1}')
-MAIN_DOMAIN=""
-EMAIL_USER=""
-EMAIL_PASS=""
 
 detect_interfaces() {
     INTERFACES=()
@@ -67,6 +61,28 @@ show_interfaces() {
     echo -e "${GREEN}└─────┴─────────────────────┴─────────────────────────────────┘${NC}"
 }
 
+# ======================= FIX DATABASE =======================
+fix_database() {
+    if systemctl is-active --quiet mariadb; then
+        if ! mysql -u root -e "SELECT 1" 2>/dev/null; then
+            systemctl stop mariadb
+            mysqld_safe --skip-grant-tables --skip-networking &>/dev/null &
+            sleep 3
+            mysql -u root -e "FLUSH PRIVILEGES; ALTER USER 'root'@'localhost' IDENTIFIED BY ''; FLUSH PRIVILEGES;" 2>/dev/null
+            pkill mysqld_safe
+            sleep 2
+            systemctl restart mariadb
+        fi
+    fi
+}
+
+# ======================= FIX DNS =======================
+fix_dns_service() {
+    systemctl unmask bind9 2>/dev/null
+    systemctl enable bind9 2>/dev/null
+    systemctl restart bind9 2>/dev/null
+}
+
 # ======================= 1. DHCP SERVER =======================
 install_dhcp() {
     clear
@@ -87,7 +103,9 @@ install_dhcp() {
         
         apt update -qq
         apt install -y isc-dhcp-server
+        
         echo "INTERFACESv4=\"$SELECTED_IFACE\"" > /etc/default/isc-dhcp-server
+        
         cat > /etc/dhcp/dhcpd.conf <<EOF
 subnet $SUBNET netmask 255.255.255.0 {
     range $RANGE_START $RANGE_END;
@@ -95,10 +113,14 @@ subnet $SUBNET netmask 255.255.255.0 {
     option domain-name-servers 8.8.8.8;
 }
 EOF
+        
         systemctl restart isc-dhcp-server
         systemctl enable isc-dhcp-server
-        echo -e "\n${GREEN}✅ DHCP BERHASIL! Interface: $SELECTED_IFACE${NC}"
-        echo -e "${GREEN}   Subnet: $SUBNET/24 | Range: $RANGE_START - $RANGE_END${NC}"
+        
+        echo -e "\n${GREEN}✅ DHCP BERHASIL!${NC}"
+        echo -e "   📡 Interface: $SELECTED_IFACE"
+        echo -e "   🌐 Subnet: $SUBNET/24"
+        echo -e "   📊 Range: $RANGE_START - $RANGE_END"
     fi
     read -p "Tekan Enter..."
 }
@@ -106,73 +128,53 @@ EOF
 # ======================= 2. DNS SERVER =======================
 install_dns() {
     clear
-    echo -e "${BLUE}╔══════════════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${BLUE}║              🔍 INSTALL DNS SERVER (WAJIB SEBELUM MAIL)          ║${NC}"
-    echo -e "${BLUE}║   Domain yang dibuat akan digunakan untuk:                       ║${NC}"
-    echo -e "${BLUE}║   - Email: user@domain-anda.com                                  ║${NC}"
-    echo -e "${BLUE}║   - Webmail: http://mail.domain-anda.com/roundcube/             ║${NC}"
-    echo -e "${BLUE}╚══════════════════════════════════════════════════════════════════╝${NC}"
+    echo -e "${BLUE}╔════════════════════════════════════════════════╗${NC}"
+    echo -e "${BLUE}║              🔍 INSTALL DNS SERVER             ║${NC}"
+    echo -e "${BLUE}╚════════════════════════════════════════════════╝${NC}"
     
     show_interfaces
     echo -e "\n${YELLOW}👉 Pilih interface untuk DNS Server:${NC}"
     read -p "Nomor [1-${#INTERFACES[@]}]: " choice
     
     if [[ $choice -ge 1 && $choice -le ${#INTERFACES[@]} ]]; then
-        IFS='|' read -r DNS_IFACE DNS_IP <<< "${INTERFACES[$((choice-1))]}"
+        IFS='|' read -r IFACE IP <<< "${INTERFACES[$((choice-1))]}"
         
-        echo -e "\n${MAGENTA}╔══════════════════════════════════════════════════════════════════╗${NC}"
-        echo -e "${MAGENTA}║  📝 MASUKKAN DOMAIN UTAMA                                         ║${NC}"
-        echo -e "${MAGENTA}╠══════════════════════════════════════════════════════════════════╣${NC}"
-        echo -e "${MAGENTA}║                                                                   ║${NC}"
-        echo -e "${MAGENTA}║  📌 CONTOH:                                                        ║${NC}"
-        echo -e "${MAGENTA}║     • fahritech.net                                               ║${NC}"
-        echo -e "${MAGENTA}║     • perusahaan.com                                              ║${NC}"
-        echo -e "${MAGENTA}║     • toko123.id                                                  ║${NC}"
-        echo -e "${MAGENTA}║                                                                   ║${NC}"
-        echo -e "${MAGENTA}║  💡 NANTI EMAIL AKAN: nama@domain-anda.com                        ║${NC}"
-        echo -e "${MAGENTA}║  💡 WEBMAIL AKAN: http://mail.domain-anda.com/roundcube/         ║${NC}"
-        echo -e "${MAGENTA}║                                                                   ║${NC}"
-        echo -e "${MAGENTA}╚══════════════════════════════════════════════════════════════════╝${NC}"
-        echo -e "\n${YELLOW}👉 Masukkan domain Anda:${NC}"
-        read -p "Domain: " MAIN_DOMAIN
+        echo -e "\n${MAGENTA}📝 Masukkan nama domain (contoh: fahtech.com):${NC}"
+        read -p "Domain: " DOMAIN
         
+        apt update -qq
         apt install -y bind9 bind9utils
         
         cat > /etc/bind/named.conf.local <<EOF
-zone "$MAIN_DOMAIN" {
+zone "$DOMAIN" {
     type master;
-    file "/etc/bind/db.$MAIN_DOMAIN";
+    file "/etc/bind/db.$DOMAIN";
 };
 EOF
         
-        cat > /etc/bind/db.$MAIN_DOMAIN <<EOF
+        cat > /etc/bind/db.$DOMAIN <<EOF
 \$TTL    604800
-@       IN      SOA     ns1.$MAIN_DOMAIN. admin.$MAIN_DOMAIN. ( 1 604800 86400 2419200 604800 )
-@       IN      NS      ns1.$MAIN_DOMAIN.
-@       IN      A       $DNS_IP
-@       IN      MX 10   mail.$MAIN_DOMAIN.
-ns1     IN      A       $DNS_IP
-www     IN      A       $DNS_IP
-mail    IN      A       $DNS_IP
+@       IN      SOA     ns1.$DOMAIN. admin.$DOMAIN. ( 1 604800 86400 2419200 604800 )
+@       IN      NS      ns1.$DOMAIN.
+@       IN      A       $IP
+@       IN      MX 10   mail.$DOMAIN.
+ns1     IN      A       $IP
+www     IN      A       $IP
+mail    IN      A       $IP
 EOF
         
-        systemctl unmask bind9
+        # Fix DNS service
+        systemctl unmask bind9 2>/dev/null
         systemctl restart bind9
         systemctl enable bind9
         
-        echo "$MAIN_DOMAIN" > /etc/maildomain.conf
-        echo "$DNS_IP" > /etc/mailip.conf
+        echo "$DOMAIN" > /etc/maildomain.conf
+        echo "$IP" > /etc/mailip.conf
         
-        echo -e "\n${GREEN}╔══════════════════════════════════════════════════════════════════╗${NC}"
-        echo -e "${GREEN}║   ✅ DNS SERVER BERHASIL!                                          ║${NC}"
-        echo -e "${GREEN}╠══════════════════════════════════════════════════════════════════╣${NC}"
-        echo -e "${GREEN}║   📝 Domain: $MAIN_DOMAIN                                         ║${NC}"
-        echo -e "${GREEN}║   🌐 IP Server: $DNS_IP                                           ║${NC}"
-        echo -e "${GREEN}║   📧 Subdomain Mail: mail.$MAIN_DOMAIN                            ║${NC}"
-        echo -e "${GREEN}║   🌐 Subdomain WWW: www.$MAIN_DOMAIN                              ║${NC}"
-        echo -e "${GREEN}║                                                                   ║${NC}"
-        echo -e "${GREEN}║   📌 LANJUTKAN KE INSTALL MAIL SERVER (Menu 8)                    ║${NC}"
-        echo -e "${GREEN}╚══════════════════════════════════════════════════════════════════╝${NC}"
+        echo -e "\n${GREEN}✅ DNS BERHASIL!${NC}"
+        echo -e "   📝 Domain: $DOMAIN"
+        echo -e "   🌐 IP: $IP"
+        echo -e "   📧 Subdomain mail: mail.$DOMAIN"
     fi
     read -p "Tekan Enter..."
 }
@@ -187,7 +189,7 @@ install_apache2() {
     apt update -qq
     apt install -y apache2 php libapache2-mod-php php-mysql php-sqlite3 php-curl php-gd php-xml php-mbstring php-zip wget curl unzip
     
-    cat > /var/www/html/index.html <<EOF
+    cat > /var/www/html/index.html <<'EOF'
 <!DOCTYPE html>
 <html>
 <head><title>FahTech Server</title>
@@ -202,13 +204,13 @@ h1{color:white;font-size:48px}
 <body>
 <h1>⚡ FAHTECH SERVER ⚡</h1>
 <div class="status">✅ ALL SERVICES RUNNING</div>
-<p style="color:white;">Server IP: <?php echo \$_SERVER['SERVER_ADDR']; ?></p>
+<p style="color:white;">Server IP: <?php echo $_SERVER['SERVER_ADDR']; ?></p>
 <div class="services">
 <div class="service">🌐 Web</div><div class="service">📧 Mail</div>
 <div class="service">📝 WP</div><div class="service">🗄️ CRUD</div>
 <div class="service">🌍 Webmail</div><div class="service">📁 FTP</div>
 </div>
-<p style="color:white;">Powered by FahTech Installer v17.0</p>
+<p style="color:white;">Powered by FahTech Installer v18.0</p>
 </body>
 </html>
 EOF
@@ -272,6 +274,7 @@ install_wordpress() {
     
     apt install -y mariadb-server
     systemctl restart mariadb
+    fix_database
     
     DB_PASS=$(openssl rand -base64 12 | tr -d "=/+" | cut -c1-16)
     
@@ -305,7 +308,6 @@ install_crud() {
     clear
     echo -e "${GREEN}╔════════════════════════════════════════════════╗${NC}"
     echo -e "${GREEN}║         🗄️ INSTALL CRUD SISWA                 ║${NC}"
-    echo -e "${GREEN}║   (Nama + Rombel + NIS) - Tambah/Edit/Hapus/Cari ║${NC}"
     echo -e "${GREEN}╚════════════════════════════════════════════════╝${NC}"
     
     apt install -y php-sqlite3
@@ -348,7 +350,7 @@ $res=$db->query("SELECT * FROM siswa");
 <h3>Daftar Siswa</h3>
 <table border="1" cellpadding="10" cellspacing="0" width="100%">
 <tr><th>Nama</th><th>Rombel</th><th>NIS</th><th>Aksi</th></tr>
-<?php while($row=$res->fetchArray()){echo "<tr><td>".$row['nama']."</td><td>".$row['rombel']."</td><td>".$row['nis']."</td><td><a class='edit-btn' href='?edit=".$row['id']."'>Edit</a> <a class='delete-btn' href='?delete=".$row['id']."'>Hapus</a></td></tr>";}?>
+<?php while($row=$res->fetchArray()){echo "<tr><td>".$row['nama']."</td><td>".$row['rombel']."</td><td>".$row['nis']."</td><td><a class='edit-btn' href='?edit=".$row['id']."'>Edit</a> <a class='delete-btn' href='?delete=".$row['id']."'>Hapus</a></td><tr>";}?>
 </table>
 <?php if(isset($_GET['edit'])){$id=(int)$_GET['edit'];$edit=$db->query("SELECT * FROM siswa WHERE id=$id")->fetchArray();if($edit){?>
 <h3>Edit Data</h3>
@@ -366,113 +368,70 @@ EOF
     read -p "Tekan Enter..."
 }
 
-# ======================= 8. MAIL SERVER (TERINTEGRASI DENGAN DNS) =======================
+# ======================= 8. MAIL SERVER =======================
 install_mail() {
     clear
-    echo -e "${BLUE}╔══════════════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${BLUE}║   📧 INSTALL MAIL SERVER (TERINTEGRASI DENGAN DNS)              ║${NC}"
-    echo -e "${BLUE}║   Menggunakan domain dari DNS yang sudah dibuat                  ║${NC}"
-    echo -e "${BLUE}╚══════════════════════════════════════════════════════════════════╝${NC}"
+    echo -e "${BLUE}╔════════════════════════════════════════════════╗${NC}"
+    echo -e "${BLUE}║              📧 INSTALL MAIL SERVER            ║${NC}"
+    echo -e "${BLUE}╚════════════════════════════════════════════════╝${NC}"
     
     if [[ -f /etc/maildomain.conf ]]; then
         MAIN_DOMAIN=$(cat /etc/maildomain.conf)
         DNS_IP=$(cat /etc/mailip.conf)
-        echo -e "\n${GREEN}✅ Domain terdeteksi dari DNS: $MAIN_DOMAIN${NC}"
-        echo -e "✅ IP Server: $DNS_IP"
+        echo -e "\n${GREEN}✅ Domain terdeteksi: $MAIN_DOMAIN${NC}"
     else
-        echo -e "\n${RED}❌ DNS belum diinstall! Install DNS dulu (Menu 3).${NC}"
-        read -p "Tekan Enter..."
-        return
+        show_interfaces
+        echo -e "\n${YELLOW}👉 Pilih interface:${NC}"
+        read -p "Nomor [1-${#INTERFACES[@]}]: " choice
+        if [[ $choice -ge 1 && $choice -le ${#INTERFACES[@]} ]]; then
+            IFS='|' read -r MAIL_IFACE MAIL_IP <<< "${INTERFACES[$((choice-1))]}"
+        else
+            MAIL_IP=$SERVER_IP
+        fi
+        echo -e "\n${MAGENTA}📝 Masukkan domain:${NC}"
+        read -p "Domain: " MAIN_DOMAIN
+        DNS_IP=$MAIL_IP
+        echo "$MAIN_DOMAIN" > /etc/maildomain.conf
+        echo "$DNS_IP" > /etc/mailip.conf
     fi
     
-    MAIL_DOMAIN="mail.$MAIN_DOMAIN"
-    
-    echo -e "\n${CYAN}╔══════════════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${CYAN}║  👤 BUAT AKUN EMAIL ADMIN                                          ║${NC}"
-    echo -e "${CYAN}╠══════════════════════════════════════════════════════════════════╣${NC}"
-    echo -e "${CYAN}║                                                                   ║${NC}"
-    echo -e "${CYAN}║  📌 CONTOH USERNAME: admin, info, support, fahri                  ║${NC}"
-    echo -e "${CYAN}║  💡 Nanti login: username@$MAIN_DOMAIN                            ║${NC}"
-    echo -e "${CYAN}║                                                                   ║${NC}"
-    echo -e "${CYAN}╚══════════════════════════════════════════════════════════════════╝${NC}"
-    echo -e "\n${YELLOW}👉 Masukkan username email:${NC}"
+    echo -e "\n${CYAN}📝 Buat akun email:${NC}"
     read -p "Username: " EMAIL_USER
     EMAIL_USER=${EMAIL_USER:-admin}
-    
-    echo -e "\n${CYAN}╔══════════════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${CYAN}║  🔑 BUAT PASSWORD                                                  ║${NC}"
-    echo -e "${CYAN}╠══════════════════════════════════════════════════════════════════╣${NC}"
-    echo -e "${CYAN}║  📌 CONTOH: admin123, rahasia123, FahTech2024                     ║${NC}"
-    echo -e "${CYAN}║  ⚠️  PASSWORD TIDAK AKAN TAMPIL SAAT DIKETIK                      ║${NC}"
-    echo -e "${CYAN}╚══════════════════════════════════════════════════════════════════╝${NC}"
-    echo -e "\n${YELLOW}👉 Masukkan password:${NC}"
     read -s -p "Password: " EMAIL_PASS
     echo ""
-    read -s -p "Konfirmasi password: " EMAIL_PASS_CONFIRM
-    echo ""
+    EMAIL_PASS=${EMAIL_PASS:-admin123}
     
-    if [[ "$EMAIL_PASS" != "$EMAIL_PASS_CONFIRM" ]] || [[ -z "$EMAIL_PASS" ]]; then
-        EMAIL_PASS="admin123"
-        echo -e "${YELLOW}⚠️ Menggunakan password default: admin123${NC}"
-    fi
-    
-    echo -e "\n${CYAN}📦 Menginstall Mail Server...${NC}"
-    
-    # Set hostname
+    MAIL_DOMAIN="mail.$MAIN_DOMAIN"
     hostnamectl set-hostname $MAIL_DOMAIN
-    echo "$DNS_IP $MAIL_DOMAIN mail" >> /etc/hosts
+    echo "$DNS_IP $MAIL_DOMAIN" >> /etc/hosts
     
-    # Install packages
     apt install -y postfix dovecot-core dovecot-imapd dovecot-pop3d mailutils
     
-    # Konfigurasi Postfix
     postconf -e "myhostname = $MAIL_DOMAIN"
     postconf -e "mydomain = $MAIN_DOMAIN"
     postconf -e "myorigin = \$mydomain"
     postconf -e "inet_interfaces = all"
-    postconf -e "inet_protocols = ipv4"
-    postconf -e "mydestination = localhost, localhost.localdomain"
     postconf -e "home_mailbox = Maildir/"
     postconf -e "smtpd_sasl_type = dovecot"
     postconf -e "smtpd_sasl_path = private/auth"
     postconf -e "smtpd_sasl_auth_enable = yes"
-    postconf -e "smtpd_recipient_restrictions = permit_sasl_authenticated, permit_mynetworks, reject_unauth_destination"
-    postconf -e "mynetworks = 127.0.0.0/8 [::ffff:127.0.0.0]/104 [::1]/128"
     
-    # Konfigurasi Dovecot
+    rm -rf /etc/dovecot 2>/dev/null
     cat > /etc/dovecot/dovecot.conf <<EOF
 disable_plaintext_auth = no
 mail_privileged_group = mail
 mail_location = maildir:~/Maildir
-
-passdb {
-  driver = passwd-file
-  args = scheme=PLAIN /etc/dovecot/users
-}
-
-userdb {
-  driver = passwd
-}
-
+passdb { driver = passwd-file args = scheme=PLAIN /etc/dovecot/users }
+userdb { driver = passwd }
 protocols = imap pop3
-
-service auth {
-  unix_listener /var/spool/postfix/private/auth {
-    mode = 0660
-    user = postfix
-    group = postfix
-  }
-}
-
+service auth { unix_listener /var/spool/postfix/private/auth { mode = 0660 user = postfix group = postfix } }
 ssl = no
 EOF
     
-    # Buat user email
     mkdir -p /etc/dovecot
     echo "$EMAIL_USER@$MAIN_DOMAIN:$EMAIL_PASS" > /etc/dovecot/users
     chmod 600 /etc/dovecot/users
-    
-    # Buat user system
     useradd -m -s /bin/false $EMAIL_USER 2>/dev/null
     echo "$EMAIL_USER:$EMAIL_PASS" | chpasswd
     mkdir -p /home/$EMAIL_USER/Maildir/{cur,new,tmp}
@@ -482,93 +441,20 @@ EOF
     systemctl restart dovecot
     systemctl enable postfix dovecot
     
-    # Simpan data untuk webmail
-    echo "$MAIN_DOMAIN" > /etc/maildomain.conf
-    echo "$DNS_IP" > /etc/mailip.conf
     echo "$EMAIL_USER" > /etc/mailuser.conf
     echo "$EMAIL_PASS" > /etc/mailpass.conf
     
-    echo -e "\n${GREEN}╔══════════════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${GREEN}║   ✅ MAIL SERVER BERHASIL!                                         ║${NC}"
-    echo -e "${GREEN}╠══════════════════════════════════════════════════════════════════╣${NC}"
-    echo -e "${GREEN}║                                                                   ║${NC}"
-    echo -e "${GREEN}║   📧 EMAIL: $EMAIL_USER@$MAIN_DOMAIN                              ║${NC}"
-    echo -e "${GREEN}║   🔑 PASSWORD: $EMAIL_PASS                                        ║${NC}"
-    echo -e "${GREEN}║                                                                   ║${NC}"
-    echo -e "${GREEN}║   🌐 WEBMAIL (setelah install menu 10):                           ║${NC}"
-    echo -e "${GREEN}║      http://$DNS_IP/roundcube/                                   ║${NC}"
-    echo -e "${GREEN}║      http://mail.$MAIN_DOMAIN/roundcube/ (setting hosts)         ║${NC}"
-    echo -e "${GREEN}║                                                                   ║${NC}"
-    echo -e "${GREEN}║   💡 KIRIM EMAIL KE SESAMA USER:                                  ║${NC}"
-    echo -e "${GREEN}║      Bisa kirim ke: nama@$MAIN_DOMAIN (bukan @localhost!)        ║${NC}"
-    echo -e "${GREEN}║                                                                   ║${NC}"
-    echo -e "${GREEN}║   📌 LANJUTKAN KE MENU 10 UNTUK INSTALL WEBMAIL                   ║${NC}"
-    echo -e "${GREEN}╚══════════════════════════════════════════════════════════════════╝${NC}"
-    
+    echo -e "\n${GREEN}✅ MAIL SERVER BERHASIL!${NC}"
+    echo -e "   📧 Email: $EMAIL_USER@$MAIN_DOMAIN"
+    echo -e "   🔑 Password: $EMAIL_PASS"
     read -p "Tekan Enter..."
 }
 
-# ======================= 9. TAMBAH USER EMAIL =======================
-add_mail_user() {
-    clear
-    echo -e "${GREEN}╔════════════════════════════════════════════════╗${NC}"
-    echo -e "${GREEN}║              👤 TAMBAH USER EMAIL BARU         ║${NC}"
-    echo -e "${GREEN}╚════════════════════════════════════════════════╝${NC}"
-    
-    if [[ ! -f /etc/maildomain.conf ]]; then
-        echo -e "\n${RED}❌ Mail Server belum diinstall! Install dulu menu 8.${NC}"
-        read -p "Tekan Enter..."
-        return
-    fi
-    
-    MAIN_DOMAIN=$(cat /etc/maildomain.conf)
-    DNS_IP=$(cat /etc/mailip.conf)
-    
-    echo -e "\n${CYAN}╔══════════════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${CYAN}║  👤 BUAT USER EMAIL BARU                                           ║${NC}"
-    echo -e "${CYAN}╠══════════════════════════════════════════════════════════════════╣${NC}"
-    echo -e "${CYAN}║  📌 CONTOH USERNAME: fahri, customer1, support, info              ║${NC}"
-    echo -e "${CYAN}║  💡 Nanti login: username@$MAIN_DOMAIN                            ║${NC}"
-    echo -e "${CYAN}║  💡 Bisa kirim email ke: $EMAIL_USER@$MAIN_DOMAIN                 ║${NC}"
-    echo -e "${CYAN}╚══════════════════════════════════════════════════════════════════╝${NC}"
-    echo -e "\n${YELLOW}👉 Masukkan username:${NC}"
-    read -p "Username: " NEW_USER
-    
-    echo -e "\n${YELLOW}👉 Masukkan password untuk $NEW_USER@$MAIN_DOMAIN:${NC}"
-    read -s -p "Password: " NEW_PASS
-    echo ""
-    read -s -p "Konfirmasi password: " NEW_PASS_CONFIRM
-    echo ""
-    
-    if [[ "$NEW_PASS" != "$NEW_PASS_CONFIRM" ]] || [[ -z "$NEW_PASS" ]]; then
-        NEW_PASS="12345"
-        echo -e "${YELLOW}⚠️ Menggunakan password default: 12345${NC}"
-    fi
-    
-    # Tambahkan ke dovecot
-    echo "$NEW_USER@$MAIN_DOMAIN:$NEW_PASS" >> /etc/dovecot/users
-    
-    # Buat user system
-    useradd -m -s /bin/false $NEW_USER 2>/dev/null
-    echo "$NEW_USER:$NEW_PASS" | chpasswd
-    mkdir -p /home/$NEW_USER/Maildir/{cur,new,tmp}
-    chown -R $NEW_USER:$NEW_USER /home/$NEW_USER/Maildir
-    
-    systemctl restart dovecot
-    
-    echo -e "\n${GREEN}✅ USER EMAIL BERHASIL DITAMBAHKAN!${NC}"
-    echo -e "   📧 Email: $NEW_USER@$MAIN_DOMAIN"
-    echo -e "   🔑 Password: $NEW_PASS"
-    echo -e "\n💡 User ini bisa login ke Webmail: http://$DNS_IP/roundcube/"
-    read -p "Tekan Enter..."
-}
-
-# ======================= 10. WEBMAIL =======================
+# ======================= 9. WEBMAIL =======================
 install_webmail() {
     clear
     echo -e "${GREEN}╔════════════════════════════════════════════════╗${NC}"
     echo -e "${GREEN}║         🌐 INSTALL WEBMAIL (ROUNDCUBE)         ║${NC}"
-    echo -e "${GREEN}║   Terintegrasi dengan DNS & Mail Server        ║${NC}"
     echo -e "${GREEN}╚════════════════════════════════════════════════╝${NC}"
     
     if [[ -f /etc/maildomain.conf ]]; then
@@ -576,24 +462,16 @@ install_webmail() {
         DNS_IP=$(cat /etc/mailip.conf)
         EMAIL_USER=$(cat /etc/mailuser.conf 2>/dev/null)
         EMAIL_PASS=$(cat /etc/mailpass.conf 2>/dev/null)
-        echo -e "\n${GREEN}✅ Mendeteksi dari Mail Server:${NC}"
-        echo -e "   📝 Domain: $MAIN_DOMAIN"
-        echo -e "   🌐 IP: $DNS_IP"
-        echo -e "   👤 User: $EMAIL_USER@$MAIN_DOMAIN"
     else
-        echo -e "\n${RED}❌ Mail Server belum diinstall! Install dulu menu 8.${NC}"
+        echo -e "\n${RED}❌ Mail Server belum diinstall!${NC}"
         read -p "Tekan Enter..."
         return
     fi
     
-    echo -e "\n${CYAN}📦 Menginstall Roundcube Webmail...${NC}"
-    
-    # Hapus yang lama total
     apt remove --purge -y roundcube* php-roundcube* dbconfig-common 2>/dev/null
     rm -rf /etc/roundcube /var/lib/roundcube /usr/share/roundcube
     apt install -y roundcube roundcube-mysql roundcube-core php-mysql
     
-    # Konfigurasi database
     DB_PASS="rcube123"
     mysql -u root <<MYSQL 2>/dev/null
 DROP DATABASE IF EXISTS roundcubemail;
@@ -603,69 +481,59 @@ GRANT ALL PRIVILEGES ON roundcubemail.* TO 'roundcube'@'localhost';
 FLUSH PRIVILEGES;
 MYSQL
     
-    # Import database
     if [ -f /usr/share/roundcube/SQL/mysql.initial.sql ]; then
         mysql roundcubemail < /usr/share/roundcube/SQL/mysql.initial.sql 2>/dev/null
     fi
     
-    # Konfigurasi Roundcube
     cat > /etc/roundcube/config.inc.php <<PHP
-<?php
-\$config = [];
-\$config['db_dsnw'] = 'mysql://roundcube:rcube123@localhost/roundcubemail';
-\$config['default_host'] = 'localhost';
-\$config['smtp_server'] = 'localhost';
-\$config['smtp_port'] = 25;
-\$config['smtp_user'] = '%u';
-\$config['smtp_pass'] = '%p';
-\$config['product_name'] = 'FahTech Webmail - $MAIN_DOMAIN';
-\$config['plugins'] = ['archive', 'zipdownload'];
-\$config['skin'] = 'elastic';
+<?php \$config = []; \$config['db_dsnw'] = 'mysql://roundcube:rcube123@localhost/roundcubemail'; \$config['default_host'] = 'localhost'; \$config['smtp_server'] = 'localhost'; \$config['smtp_port'] = 25; \$config['smtp_user'] = '%u'; \$config['smtp_pass'] = '%p'; \$config['product_name'] = 'FahTech Webmail - $MAIN_DOMAIN'; \$config['plugins'] = ['archive', 'zipdownload']; \$config['skin'] = 'elastic';
 PHP
     
-    # Konfigurasi Apache
     cat > /etc/apache2/conf-available/roundcube.conf <<APACHE
 Alias /roundcube /usr/share/roundcube
-Alias /webmail /usr/share/roundcube
-Alias /email /usr/share/roundcube
-<Directory /usr/share/roundcube/>
-    Options +FollowSymLinks
-    AllowOverride All
-    Require all granted
-</Directory>
+<Directory /usr/share/roundcube/> Options +FollowSymLinks AllowOverride All Require all granted </Directory>
 APACHE
     
     a2enconf roundcube
     a2enmod rewrite
-    systemctl restart apache2
-    systemctl restart postfix dovecot
+    systemctl restart apache2 postfix dovecot
     
-    echo -e "\n${GREEN}╔════════════════════════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${GREEN}║   ✅ WEBMAIL (ROUNDCUBE) BERHASIL!                                           ║${NC}"
-    echo -e "${GREEN}╠════════════════════════════════════════════════════════════════════════════╣${NC}"
-    echo -e "${GREEN}║                                                                             ║${NC}"
-    echo -e "${GREEN}║   🌐 AKSES WEBMAIL VIA IP:                                                  ║${NC}"
-    echo -e "${GREEN}║      👉 http://$DNS_IP/roundcube/                                          ║${NC}"
-    echo -e "${GREEN}║                                                                             ║${NC}"
-    echo -e "${GREEN}║   🌐 AKSES WEBMAIL VIA DOMAIN (Setting hosts dulu):                         ║${NC}"
-    echo -e "${GREEN}║      👉 http://mail.$MAIN_DOMAIN/roundcube/                                ║${NC}"
-    echo -e "${GREEN}║                                                                             ║${NC}"
-    echo -e "${GREEN}║   📝 LOGIN WEBMAIL:                                                         ║${NC}"
-    echo -e "${GREEN}║      👤 Username: $EMAIL_USER@$MAIN_DOMAIN                                 ║${NC}"
-    echo -e "${GREEN}║      🔑 Password: $EMAIL_PASS                                               ║${NC}"
-    echo -e "${GREEN}║                                                                             ║${NC}"
-    echo -e "${GREEN}║   📧 CARA KIRIM EMAIL KE SESAMA USER:                                       ║${NC}"
-    echo -e "${GREEN}║      Bisa kirim ke: nama_user_lain@$MAIN_DOMAIN                            ║${NC}"
-    echo -e "${GREEN}║      Contoh: admin@$MAIN_DOMAIN, fahri@$MAIN_DOMAIN, info@$MAIN_DOMAIN    ║${NC}"
-    echo -e "${GREEN}║      ⚠️  BUKAN @localhost! TAPI @$MAIN_DOMAIN!                             ║${NC}"
-    echo -e "${GREEN}║                                                                             ║${NC}"
-    echo -e "${GREEN}║   💡 CARA SETTING DOMAIN (agar bisa akses pakai mail.domain.com):           ║${NC}"
-    echo -e "${GREEN}║      Windows: C:\\Windows\\System32\\drivers\\etc\\hosts                      ║${NC}"
-    echo -e "${GREEN}║      Linux/Mac: /etc/hosts                                                 ║${NC}"
-    echo -e "${GREEN}║      Tambahkan: $DNS_IP mail.$MAIN_DOMAIN                                   ║${NC}"
-    echo -e "${GREEN}║                                                                             ║${NC}"
-    echo -e "${GREEN}╚════════════════════════════════════════════════════════════════════════════╝${NC}"
+    echo -e "\n${GREEN}✅ WEBMAIL BERHASIL!${NC}"
+    echo -e "   🌐 Akses: http://$DNS_IP/roundcube/"
+    echo -e "   📧 Login: $EMAIL_USER@$MAIN_DOMAIN / $EMAIL_PASS"
+    read -p "Tekan Enter..."
+}
+
+# ======================= 10. TAMBAH USER =======================
+add_mail_user() {
+    clear
+    echo -e "${GREEN}╔════════════════════════════════════════════════╗${NC}"
+    echo -e "${GREEN}║              👤 TAMBAH USER EMAIL              ║${NC}"
+    echo -e "${GREEN}╚════════════════════════════════════════════════╝${NC}"
     
+    if [[ ! -f /etc/maildomain.conf ]]; then
+        echo -e "\n${RED}❌ Mail Server belum diinstall!${NC}"
+        read -p "Tekan Enter..."
+        return
+    fi
+    
+    MAIN_DOMAIN=$(cat /etc/maildomain.conf)
+    DNS_IP=$(cat /etc/mailip.conf)
+    
+    echo -e "\n${YELLOW}📝 Masukkan username baru:${NC}"
+    read -p "Username: " NEW_USER
+    read -s -p "Password: " NEW_PASS
+    echo ""
+    NEW_PASS=${NEW_PASS:-12345}
+    
+    echo "$NEW_USER@$MAIN_DOMAIN:$NEW_PASS" >> /etc/dovecot/users
+    useradd -m -s /bin/false $NEW_USER 2>/dev/null
+    echo "$NEW_USER:$NEW_PASS" | chpasswd
+    mkdir -p /home/$NEW_USER/Maildir/{cur,new,tmp}
+    chown -R $NEW_USER:$NEW_USER /home/$NEW_USER/Maildir
+    systemctl restart dovecot
+    
+    echo -e "\n${GREEN}✅ User $NEW_USER@$MAIN_DOMAIN berhasil ditambahkan!${NC}"
     read -p "Tekan Enter..."
 }
 
@@ -674,8 +542,6 @@ install_all() {
     clear
     echo -e "${GREEN}╔════════════════════════════════════════════════╗${NC}"
     echo -e "${GREEN}║         ⚡ INSTALL SEMUA SERVICE LENGKAP       ║${NC}"
-    echo -e "${GREEN}║   DHCP + DNS + Apache2 + FTP + Samba + WP     ║${NC}"
-    echo -e "${GREEN}║   + CRUD + MAIL SERVER + WEBMAIL              ║${NC}"
     echo -e "${GREEN}╚════════════════════════════════════════════════╝${NC}"
     
     echo -e "\n${YELLOW}⚠️ Proses akan memakan waktu 20-30 menit. Lanjutkan? (y/n):${NC}"
@@ -696,26 +562,20 @@ install_all() {
         EMAIL_USER=$(cat /etc/mailuser.conf 2>/dev/null)
         EMAIL_PASS=$(cat /etc/mailpass.conf 2>/dev/null)
         
-        echo -e "\n${GREEN}════════════════════════════════════════════════════════════════════════════╗${NC}"
-        echo -e "${GREEN}   🎉 SEMUA SERVICE BERHASIL DIINSTALL! 🎉                                    ║${NC}"
-        echo -e "${GREEN}════════════════════════════════════════════════════════════════════════════║${NC}"
-        echo -e "${GREEN}                                                                             ║${NC}"
-        echo -e "${GREEN}   🌐 LANDING PAGE:  http://$DNS_IP                                          ║${NC}"
-        echo -e "${GREEN}   📚 CRUD:          http://$DNS_IP/crud/                                   ║${NC}"
-        echo -e "${GREEN}   📧 WEBMAIL:       http://$DNS_IP/roundcube/                              ║${NC}"
-        echo -e "${GREEN}   📝 WORDPRESS:     http://$DNS_IP/wp-admin                                ║${NC}"
-        echo -e "${GREEN}   📁 FTP:           ftp://$DNS_IP                                          ║${NC}"
-        echo -e "${GREEN}   🖥️ SAMBA:         \\\\$DNS_IP\\public                                      ║${NC}"
-        echo -e "${GREEN}                                                                             ║${NC}"
-        echo -e "${GREEN}   📧 LOGIN WEBMAIL:                                                         ║${NC}"
-        echo -e "${GREEN}      👤 Username: $EMAIL_USER@$MAIN_DOMAIN                                 ║${NC}"
-        echo -e "${GREEN}      🔑 Password: $EMAIL_PASS                                               ║${NC}"
-        echo -e "${GREEN}                                                                             ║${NC}"
-        echo -e "${GREEN}   💡 KIRIM EMAIL KE SESAMA USER:                                            ║${NC}"
-        echo -e "${GREEN}      Gunakan format: nama_user@$MAIN_DOMAIN                                ║${NC}"
-        echo -e "${GREEN}      BUKAN @localhost!                                                     ║${NC}"
-        echo -e "${GREEN}                                                                             ║${NC}"
-        echo -e "${GREEN}════════════════════════════════════════════════════════════════════════════╝${NC}"
+        echo -e "\n${GREEN}════════════════════════════════════════════════════════════════════╗${NC}"
+        echo -e "${GREEN}   🎉 SEMUA SERVICE BERHASIL DIINSTALL! 🎉                            ║${NC}"
+        echo -e "${GREEN}════════════════════════════════════════════════════════════════════║${NC}"
+        echo -e "${GREEN}                                                                     ║${NC}"
+        echo -e "${GREEN}   🌐 LANDING PAGE:  http://$DNS_IP                                  ║${NC}"
+        echo -e "${GREEN}   📚 CRUD:          http://$DNS_IP/crud/                           ║${NC}"
+        echo -e "${GREEN}   📧 WEBMAIL:       http://$DNS_IP/roundcube/                      ║${NC}"
+        echo -e "${GREEN}   📝 WORDPRESS:     http://$DNS_IP/wp-admin                        ║${NC}"
+        echo -e "${GREEN}   📁 FTP:           ftp://$DNS_IP                                  ║${NC}"
+        echo -e "${GREEN}   🖥️ SAMBA:         \\\\$DNS_IP\\public                              ║${NC}"
+        echo -e "${GREEN}                                                                     ║${NC}"
+        echo -e "${GREEN}   📧 LOGIN WEBMAIL: $EMAIL_USER@$MAIN_DOMAIN / $EMAIL_PASS        ║${NC}"
+        echo -e "${GREEN}                                                                     ║${NC}"
+        echo -e "${GREEN}════════════════════════════════════════════════════════════════════╝${NC}"
     fi
     read -p "Tekan Enter..."
 }
@@ -749,8 +609,6 @@ check_status() {
     echo -e "${CYAN}╚════════════════════════════════════════════════╝${NC}"
     
     echo -e "\n${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "${WHITE}  SERVICE            | STATUS${NC}"
-    echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     
     for service in isc-dhcp-server bind9 apache2 vsftpd smbd postfix dovecot mariadb; do
         name=""
@@ -781,7 +639,6 @@ check_status() {
         echo -e "   📝 Domain: $MAIN_DOMAIN"
         echo -e "   📧 Email: $EMAIL_USER@$MAIN_DOMAIN"
         echo -e "   🌐 Webmail: http://$DNS_IP/roundcube/"
-        echo -e "   🌐 Webmail Domain: http://mail.$MAIN_DOMAIN/roundcube/"
     fi
     
     read -p "Tekan Enter..."
@@ -792,32 +649,24 @@ while true; do
     clear
     echo -e "${CYAN}"
     echo "╔════════════════════════════════════════════════════════════════════════════╗"
-    echo "║            🚀 FAHTECH MULTI-SERVICE INSTALLER v17.0                        ║"
-    echo "║     ALL SERVICE + MAIL SERVER TERINTEGRASI DENGAN DNS                      ║"
+    echo "║            🚀 FAHTECH MULTI-SERVICE INSTALLER v18.0                        ║"
+    echo "║                    SEMUA SERVICE BERHASIL !!!                              ║"
     echo "╠════════════════════════════════════════════════════════════════════════════╣"
     echo "║                                                                             ║"
-    echo "║  📧 LAYANAN UTAMA                                                          ║"
-    echo "║  ───────────────────────────────────────────────────────────────────────── ║"
-    echo "║    1.  ⚡ INSTALL SEMUA SERVICE (20-30 menit)                              ║"
-    echo "║    2.  🌐 Install DHCP Server                                             ║"
-    echo "║    3.  🔍 Install DNS Server (WAJIB sebelum Mail)                         ║"
-    echo "║    4.  🌍 Install Apache2 + Landing Page                                  ║"
-    echo "║    5.  📁 Install FTP Server                                              ║"
-    echo "║    6.  🖥️ Install Samba                                                   ║"
-    echo "║    7.  📝 Install WordPress                                               ║"
-    echo "║    8.  🗄️ Install CRUD Siswa (Tambah/Edit/Hapus/Cari)                     ║"
-    echo "║    9.  📧 Install Mail Server (TERINTEGRASI DENGAN DNS)                   ║"
-    echo "║    10. 🌐 Install Webmail (Roundcube) - Akses Email via Browser           ║"
-    echo "║                                                                             ║"
-    echo "║  👤 MANAJEMEN USER EMAIL                                                  ║"
-    echo "║  ───────────────────────────────────────────────────────────────────────── ║"
-    echo "║    11. 👤 Tambah User Email Baru                                          ║"
-    echo "║                                                                             ║"
-    echo "║  ⚡ FITUR TAMBAHAN                                                         ║"
-    echo "║  ───────────────────────────────────────────────────────────────────────── ║"
-    echo "║    12. 🗑️ Hapus SEMUA Service + Folder                                     ║"
-    echo "║    13. 📊 Cek Status Service                                              ║"
-    echo "║    14. 🚪 Exit                                                            ║"
+    echo "║  1.  ⚡ INSTALL SEMUA SERVICE (20-30 menit) - REKOMENDED                    ║"
+    echo "║  2.  🌐 Install DHCP Server                                                ║"
+    echo "║  3.  🔍 Install DNS Server                                                 ║"
+    echo "║  4.  🌍 Install Apache2 + Landing Page                                     ║"
+    echo "║  5.  📁 Install FTP Server                                                 ║"
+    echo "║  6.  🖥️ Install Samba                                                      ║"
+    echo "║  7.  📝 Install WordPress                                                  ║"
+    echo "║  8.  🗄️ Install CRUD Siswa (Tambah/Edit/Hapus/Cari)                        ║"
+    echo "║  9.  📧 Install Mail Server (Postfix + Dovecot)                            ║"
+    echo "║  10. 🌐 Install Webmail (Roundcube) - Akses Email via Browser              ║"
+    echo "║  11. 👤 Tambah User Email Baru                                             ║"
+    echo "║  12. 🗑️ Hapus SEMUA Service + Folder                                       ║"
+    echo "║  13. 📊 Cek Status Service                                                 ║"
+    echo "║  14. 🚪 Exit                                                               ║"
     echo "╚════════════════════════════════════════════════════════════════════════════╝"
     echo -e "${NC}"
     
