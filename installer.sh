@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # ============================================================
-#   FAHTECH - MULTI-SERVICE INSTALLER PRO v21.0
-#   SEMUA SERVICE PASTI BERHASIL | NO ERROR
+#   FAHTECH - 3 DNS SERVER with WEB INTERFACE
+#   DNS1: Tutorial DHCP | DNS2: Tutorial CRUD | DNS3: Tutorial Apache2
 # ============================================================
 
 RED='\033[0;31m'
@@ -10,24 +10,14 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 CYAN='\033[0;36m'
-MAGENTA='\033[0;35m'
-WHITE='\033[1;37m'
 NC='\033[0m'
 
 clear
 echo -e "${CYAN}"
-echo "╔══════════════════════════════════════════════════════════════════════════════╗"
-echo "║                                                                              ║"
-echo "║   ███████╗ █████╗ ██╗  ██╗████████╗███████╗ ██████╗██╗  ██╗                 ║"
-echo "║   ██╔════╝██╔══██╗██║  ██║╚══██╔══╝██╔════╝██╔════╝██║  ██║                 ║"
-echo "║   █████╗  ███████║███████║   ██║   █████╗  ██║     ███████║                 ║"
-echo "║   ██╔══╝  ██╔══██║██╔══██║   ██║   ██╔══╝  ██║     ██╔══██║                 ║"
-echo "║   ██║     ██║  ██║██║  ██║   ██║   ███████╗╚██████╗██║  ██║                 ║"
-echo "║   ╚═╝     ╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝   ╚══════╝ ╚═════╝╚═╝  ╚═╝                 ║"
-echo "║                                                                              ║"
-echo "║              MULTI-SERVICE INSTALLER PROFESSIONAL v21.0                      ║"
-echo "║                 SEMUA SERVICE PASTI BERHASIL                                 ║"
-echo "╚══════════════════════════════════════════════════════════════════════════════╝"
+echo "╔══════════════════════════════════════════════════════════════════╗"
+echo "║   3 DNS SERVER dengan 3 TAMPILAN WEB BERBEDA                     ║"
+echo "║   DNS1: Tutorial DHCP | DNS2: Tutorial CRUD | DNS3: Tutorial Apache2 ║"
+echo "╚══════════════════════════════════════════════════════════════════╝"
 echo -e "${NC}"
 
 if [[ $EUID -ne 0 ]]; then
@@ -61,63 +51,314 @@ show_interfaces() {
     echo -e "${GREEN}└─────┴─────────────────────┴─────────────────────────────────┘${NC}"
 }
 
-# ======================= 1. APACHE2 =======================
-install_apache2() {
+# ======================= CLEAN DNS =======================
+clean_dns() {
+    systemctl stop bind9 2>/dev/null
+    systemctl disable bind9 2>/dev/null
+    apt remove --purge -y bind9 bind9utils 2>/dev/null
+    rm -rf /etc/bind /var/lib/bind /var/cache/bind
+}
+
+# ======================= INSTALL DNS1 (Tampilan Web - Tutorial DHCP) =======================
+install_dns1() {
     clear
-    echo -e "${GREEN}╔════════════════════════════════════════════════╗${NC}"
-    echo -e "${GREEN}║              🌍 INSTALL APACHE2                ║${NC}"
-    echo -e "${GREEN}╚════════════════════════════════════════════════╝${NC}"
+    echo -e "${BLUE}╔══════════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${BLUE}║     🔍 DNS SERVER 1 - TUTORIAL DHCP (Tampilan Web Keren)         ║${NC}"
+    echo -e "${BLUE}╚══════════════════════════════════════════════════════════════════╝${NC}"
     
-    apt update -qq
-    apt install -y apache2 php libapache2-mod-php php-mysql php-sqlite3 php-curl php-gd php-xml php-mbstring php-zip wget curl unzip
+    show_interfaces
+    echo -e "\n${YELLOW}👉 Pilih interface untuk DNS Server 1:${NC}"
+    read -p "Nomor: " choice
     
-    cat > /var/www/html/index.html <<'EOF'
+    if [[ $choice -ge 1 && $choice -le ${#INTERFACES[@]} ]]; then
+        IFS='|' read -r IFACE IP <<< "${INTERFACES[$((choice-1))]}"
+        echo -e "\n${MAGENTA}📝 Masukkan domain (contoh: dhcp.fahtech.com):${NC}"
+        read -p "Domain: " DOMAIN
+        
+        # Install Apache2 dan PHP
+        apt update -qq
+        apt install -y apache2 php libapache2-mod-php
+        
+        # Install DNS
+        clean_dns
+        apt install -y bind9 bind9utils
+        
+        mkdir -p /etc/bind /var/lib/bind /var/cache/bind
+        chown -R bind:bind /var/lib/bind /var/cache/bind
+        
+        cat > /etc/bind/named.conf.local <<EOF
+zone "$DOMAIN" {
+    type master;
+    file "/etc/bind/db.$DOMAIN";
+};
+EOF
+        
+        cat > /etc/bind/db.$DOMAIN <<EOF
+\$TTL    604800
+@       IN      SOA     ns1.$DOMAIN. admin.$DOMAIN. ( 1 604800 86400 2419200 604800 )
+@       IN      NS      ns1.$DOMAIN.
+@       IN      A       $IP
+ns1     IN      A       $IP
+www     IN      A       $IP
+EOF
+        
+        cat > /etc/bind/named.conf.options <<EOF
+options {
+    directory "/var/cache/bind";
+    recursion yes;
+    allow-query { any; };
+    forwarders { 8.8.8.8; 8.8.4.4; };
+    listen-on { any; };
+};
+EOF
+        
+        systemctl start bind9
+        systemctl enable bind9
+        
+        # BUAT TAMPILAN WEB UNTUK DNS1 (Tutorial DHCP)
+        mkdir -p /var/www/html/$DOMAIN
+        cat > /var/www/html/$DOMAIN/index.html <<'HTML'
 <!DOCTYPE html>
-<html>
-<head><title>FahTech Server</title>
-<style>
-body{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);font-family:Arial;text-align:center;padding:50px}
-h1{color:white;font-size:48px}
-.status{background:#4CAF50;padding:10px;border-radius:10px;color:white}
-.services{display:flex;justify-content:center;gap:20px;margin-top:30px;flex-wrap:wrap}
-.service{background:white;padding:15px;border-radius:10px;min-width:120px}
-</style>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DNS Server 1 - Tutorial DHCP</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+            padding: 40px;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: rgba(255,255,255,0.95);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            animation: fadeIn 0.5s ease;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        h1 {
+            color: #2c5364;
+            font-size: 36px;
+            margin-bottom: 10px;
+            border-left: 5px solid #2c5364;
+            padding-left: 20px;
+        }
+        .badge {
+            background: #2c5364;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            display: inline-block;
+            font-size: 12px;
+            margin-bottom: 20px;
+        }
+        .info {
+            background: #e8f4f8;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        pre {
+            background: #1a1a2e;
+            color: #0f0;
+            padding: 20px;
+            border-radius: 10px;
+            overflow-x: auto;
+            font-size: 14px;
+            margin: 20px 0;
+        }
+        .step {
+            background: white;
+            border-left: 4px solid #2c5364;
+            padding: 15px;
+            margin: 15px 0;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .step h3 { color: #2c5364; margin-bottom: 10px; }
+        code { background: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #e83e8c; }
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+            color: #888;
+        }
+    </style>
 </head>
 <body>
-<h1>⚡ FAHTECH SERVER ⚡</h1>
-<div class="status">✅ ALL SERVICES RUNNING</div>
-<p style="color:white;">Server IP: <?php echo $_SERVER['SERVER_ADDR']; ?></p>
-<div class="services">
-<div class="service">🌐 Web</div><div class="service">📧 Mail</div>
-<div class="service">📝 WP</div><div class="service">🗄️ CRUD</div>
-<div class="service">🌍 Webmail</div><div class="service">📁 FTP</div>
+<div class="container">
+    <div class="badge">🔍 DNS SERVER 1</div>
+    <h1>📖 Tutorial DHCP Server Debian</h1>
+    <p>Panduan lengkap membuat DHCP Server di Debian 12/Ubuntu 22.04</p>
+    
+    <div class="info">
+        <strong>📡 Domain:</strong> <code id="domain"></code> &nbsp;|&nbsp;
+        <strong>🌐 IP Server:</strong> <code id="ip"></code>
+    </div>
+    
+    <div class="step">
+        <h3>📌 LANGKAH 1: Install DHCP Server</h3>
+        <pre><code>sudo apt update
+sudo apt install isc-dhcp-server -y</code></pre>
+    </div>
+    
+    <div class="step">
+        <h3>📌 LANGKAH 2: Konfigurasi Interface</h3>
+        <pre><code>sudo nano /etc/default/isc-dhcp-server
+# Isi dengan:
+INTERFACESv4="ens33"</code></pre>
+    </div>
+    
+    <div class="step">
+        <h3>📌 LANGKAH 3: Konfigurasi DHCP</h3>
+        <pre><code>sudo nano /etc/dhcp/dhcpd.conf
+# Isi dengan:
+subnet 192.168.1.0 netmask 255.255.255.0 {
+    range 192.168.1.100 192.168.1.200;
+    option routers 192.168.1.1;
+    option domain-name-servers 8.8.8.8, 8.8.4.4;
+}</code></pre>
+    </div>
+    
+    <div class="step">
+        <h3>📌 LANGKAH 4: Start DHCP Server</h3>
+        <pre><code>sudo systemctl restart isc-dhcp-server
+sudo systemctl enable isc-dhcp-server
+sudo systemctl status isc-dhcp-server</code></pre>
+    </div>
+    
+    <div class="step">
+        <h3>📌 LANGKAH 5: Lihat Client yang Terhubung</h3>
+        <pre><code>sudo cat /var/lib/dhcp/dhcpd.leases</code></pre>
+    </div>
+    
+    <div class="step">
+        <h3>📌 LANGKAH 6: Test dari Client</h3>
+        <pre><code># Windows:
+ipconfig /renew
+
+# Linux:
+sudo dhclient eth0</code></pre>
+    </div>
+    
+    <div class="footer">
+        Powered by FahTech Installer | Tutorial DHCP Server
+    </div>
 </div>
-<p style="color:white;">Powered by FahTech Installer v21.0</p>
+<script>
+    document.getElementById('domain').innerText = window.location.hostname;
+    document.getElementById('ip').innerText = window.location.hostname;
+</script>
 </body>
 </html>
+HTML
+        
+        # Ganti IP dan domain di HTML
+        sed -i "s/ens33/$IFACE/g" /var/www/html/$DOMAIN/index.html
+        sed -i "s/192.168.1.0/${IP%.*}.0/g" /var/www/html/$DOMAIN/index.html
+        sed -i "s/192.168.1.100/${IP%.*}.100/g" /var/www/html/$DOMAIN/index.html
+        sed -i "s/192.168.1.200/${IP%.*}.200/g" /var/www/html/$DOMAIN/index.html
+        sed -i "s/192.168.1.1/${IP%.*}.1/g" /var/www/html/$DOMAIN/index.html
+        
+        # Buat virtual host
+        cat > /etc/apache2/sites-available/$DOMAIN.conf <<EOF
+<VirtualHost *:80>
+    ServerName $DOMAIN
+    ServerAlias www.$DOMAIN
+    DocumentRoot /var/www/html/$DOMAIN
+    ErrorLog \${APACHE_LOG_DIR}/error.log
+    CustomLog \${APACHE_LOG_DIR}/access.log combined
+</VirtualHost>
 EOF
-    
-    systemctl restart apache2
-    echo -e "\n${GREEN}✅ APACHE2 BERHASIL! Akses: http://$SERVER_IP${NC}"
+        
+        a2ensite $DOMAIN.conf
+        a2dissite 000-default.conf
+        systemctl reload apache2
+        
+        echo -e "\n${GREEN}✅ DNS SERVER 1 BERHASIL!${NC}"
+        echo -e "   🌐 Akses Web: http://$DOMAIN"
+        echo -e "   📝 Domain: $DOMAIN"
+        echo -e "   🌐 IP: $IP"
+        echo -e "\n${YELLOW}💡 Untuk akses dari laptop, tambahkan ke file hosts:${NC}"
+        echo -e "   echo '$IP $DOMAIN' >> /etc/hosts"
+    fi
     read -p "Tekan Enter..."
 }
 
-# ======================= 2. CRUD SISWA =======================
-install_crud() {
+# ======================= INSTALL DNS2 (Tampilan Web - Tutorial CRUD) =======================
+install_dns2() {
     clear
-    echo -e "${GREEN}╔════════════════════════════════════════════════╗${NC}"
-    echo -e "${GREEN}║         🗄️ INSTALL CRUD SISWA                 ║${NC}"
-    echo -e "${GREEN}║   (Nama + Rombel + NIS) - Tambah/Edit/Hapus/Cari ║${NC}"
-    echo -e "${GREEN}╚════════════════════════════════════════════════╝${NC}"
+    echo -e "${MAGENTA}╔══════════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${MAGENTA}║     🔍 DNS SERVER 2 - TUTORIAL CRUD (Tampilan Web Keren)         ║${NC}"
+    echo -e "${MAGENTA}╚══════════════════════════════════════════════════════════════════╝${NC}"
     
-    apt install -y php-sqlite3
-    mkdir -p /var/www/html/crud
+    show_interfaces
+    echo -e "\n${YELLOW}👉 Pilih interface untuk DNS Server 2:${NC}"
+    read -p "Nomor: " choice
     
-    cat > /var/www/html/crud/index.php <<'EOF'
+    if [[ $choice -ge 1 && $choice -le ${#INTERFACES[@]} ]]; then
+        IFS='|' read -r IFACE IP <<< "${INTERFACES[$((choice-1))]}"
+        echo -e "\n${MAGENTA}📝 Masukkan domain (contoh: crud.fahtech.com):${NC}"
+        read -p "Domain: " DOMAIN
+        
+        apt update -qq
+        apt install -y apache2 php libapache2-mod-php php-sqlite3
+        
+        clean_dns
+        apt install -y bind9 bind9utils
+        
+        mkdir -p /etc/bind /var/lib/bind /var/cache/bind
+        chown -R bind:bind /var/lib/bind /var/cache/bind
+        
+        cat > /etc/bind/named.conf.local <<EOF
+zone "$DOMAIN" {
+    type master;
+    file "/etc/bind/db.$DOMAIN";
+};
+EOF
+        
+        cat > /etc/bind/db.$DOMAIN <<EOF
+\$TTL    604800
+@       IN      SOA     ns1.$DOMAIN. admin.$DOMAIN. ( 2 604800 86400 2419200 604800 )
+@       IN      NS      ns1.$DOMAIN.
+@       IN      A       $IP
+ns1     IN      A       $IP
+www     IN      A       $IP
+EOF
+        
+        cat > /etc/bind/named.conf.options <<EOF
+options {
+    directory "/var/cache/bind";
+    recursion yes;
+    allow-query { any; };
+    forwarders { 8.8.8.8; 8.8.4.4; };
+    listen-on { any; };
+};
+EOF
+        
+        systemctl start bind9
+        systemctl enable bind9
+        
+        # BUAT TAMPILAN WEB UNTUK DNS2 (Tutorial CRUD)
+        mkdir -p /var/www/html/crud
+        mkdir -p /var/www/html/$DOMAIN
+        
+        # Buat CRUD aplikasi
+        cat > /var/www/html/crud/index.php <<'PHP'
 <!DOCTYPE html>
 <html>
 <head><title>CRUD Siswa</title>
 <style>
+*{margin:0;padding:0;box-sizing:border-box}
 body{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);font-family:Arial;padding:40px}
 .container{max-width:800px;margin:auto;background:#fff;border-radius:20px;padding:30px}
 h1{color:#667eea}
@@ -148,9 +389,9 @@ $res=$db->query("SELECT * FROM siswa");
 <button type="submit" name="add">Tambah</button>
 </form>
 <h3>Daftar Siswa</h3>
-<table border="1" cellpadding="10" cellspacing="0" width="100%">
+<table border="1" cellpadding="10">
 <tr><th>Nama</th><th>Rombel</th><th>NIS</th><th>Aksi</th></tr>
-<?php while($row=$res->fetchArray()){echo "<tr><td>".$row['nama']."</td><td>".$row['rombel']."</td><td>".$row['nis']."</td><td><a class='edit-btn' href='?edit=".$row['id']."'>Edit</a> <a class='delete-btn' href='?delete=".$row['id']."'>Hapus</a></td><td>";}?>
+<?php while($row=$res->fetchArray()){echo "<tr><td>".$row['nama']."</td><td>".$row['rombel']."</td><td>".$row['nis']."</td><td><a class='edit-btn' href='?edit=".$row['id']."'>Edit</a> <a class='delete-btn' href='?delete=".$row['id']."'>Hapus</a></td></tr>";}?>
 </table>
 <?php if(isset($_GET['edit'])){$id=(int)$_GET['edit'];$edit=$db->query("SELECT * FROM siswa WHERE id=$id")->fetchArray();if($edit){?>
 <h3>Edit Data</h3>
@@ -159,82 +400,129 @@ $res=$db->query("SELECT * FROM siswa");
 </div>
 </body>
 </html>
-EOF
-    
-    chown -R www-data:www-data /var/www/html/crud
-    systemctl restart apache2
-    
-    echo -e "\n${GREEN}✅ CRUD SISWA BERHASIL! Akses: http://$SERVER_IP/crud/${NC}"
-    read -p "Tekan Enter..."
-}
+PHP
+        
+        # Buat landing page untuk DNS2
+        cat > /var/www/html/$DOMAIN/index.html <<HTML
+<!DOCTYPE html>
+<html>
+<head><title>DNS Server 2 - Tutorial CRUD</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);font-family:'Segoe UI',Arial;min-height:100vh;padding:40px}
+.container{max-width:1000px;margin:auto;background:white;border-radius:20px;padding:40px;box-shadow:0 20px 60px rgba(0,0,0,0.3)}
+h1{color:#667eea;border-left:5px solid #667eea;padding-left:20px}
+.badge{background:#667eea;color:white;padding:5px 15px;border-radius:20px;display:inline-block;font-size:12px}
+pre{background:#1a1a2e;color:#0f0;padding:20px;border-radius:10px;overflow-x:auto;margin:20px 0}
+.step{background:#f8f9fa;border-left:4px solid #667eea;padding:15px;margin:15px 0}
+code{background:#f4f4f4;padding:2px 6px;border-radius:4px;color:#e83e8c}
+.footer{text-align:center;margin-top:40px;padding-top:20px;border-top:1px solid #ddd;color:#888}
+</style>
+</head>
+<body>
+<div class="container">
+<div class="badge">🗄️ DNS SERVER 2</div>
+<h1>📖 Tutorial CRUD Siswa dengan PHP & SQLite</h1>
+<p>Panduan lengkap membuat aplikasi CRUD (Create, Read, Update, Delete) untuk data siswa</p>
 
-# ======================= 3. DHCP SERVER =======================
-install_dhcp() {
-    clear
-    echo -e "${BLUE}╔════════════════════════════════════════════════╗${NC}"
-    echo -e "${BLUE}║              🌐 INSTALL DHCP SERVER            ║${NC}"
-    echo -e "${BLUE}╚════════════════════════════════════════════════╝${NC}"
-    
-    show_interfaces
-    echo -e "\n${YELLOW}👉 Pilih interface untuk DHCP Server:${NC}"
-    read -p "Nomor [1-${#INTERFACES[@]}]: " choice
-    
-    if [[ $choice -ge 1 && $choice -le ${#INTERFACES[@]} ]]; then
-        IFS='|' read -r SELECTED_IFACE SELECTED_IP <<< "${INTERFACES[$((choice-1))]}"
-        SUBNET=$(echo $SELECTED_IP | cut -d. -f1-3).0
-        GATEWAY=$(echo $SELECTED_IP | cut -d. -f1-3).1
-        RANGE_START=$(echo $SELECTED_IP | cut -d. -f1-3).100
-        RANGE_END=$(echo $SELECTED_IP | cut -d. -f1-3).200
+<div class="step">
+<h3>📌 LANGKAH 1: Install Apache2 & PHP</h3>
+<pre><code>sudo apt install apache2 php libapache2-mod-php php-sqlite3 -y</code></pre>
+</div>
+
+<div class="step">
+<h3>📌 LANGKAH 2: Buat Folder CRUD</h3>
+<pre><code>sudo mkdir -p /var/www/html/crud</code></pre>
+</div>
+
+<div class="step">
+<h3>📌 LANGKAH 3: Buat File index.php</h3>
+<pre><code>sudo nano /var/www/html/crud/index.php</code></pre>
+</div>
+
+<div class="step">
+<h3>📌 LANGKAH 4: Struktur Database</h3>
+<pre><code>CREATE TABLE siswa (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nama TEXT NOT NULL,
+    rombel TEXT NOT NULL,
+    nis TEXT NOT NULL UNIQUE
+);</code></pre>
+</div>
+
+<div class="step">
+<h3>📌 LANGKAH 5: Fitur CRUD</h3>
+<pre><code>➕ CREATE: INSERT INTO siswa (nama, rombel, nis) VALUES (...)
+📖 READ: SELECT * FROM siswa ORDER BY id DESC
+✏️ UPDATE: UPDATE siswa SET nama='...' WHERE id=...
+🗑️ DELETE: DELETE FROM siswa WHERE id=...
+🔍 SEARCH: SELECT * FROM siswa WHERE nama LIKE '%...%'</code></pre>
+</div>
+
+<div class="step">
+<h3>📌 LANGKAH 6: Akses CRUD</h3>
+<pre><code>Buka browser: http://<span id="ip"></span>/crud/</code></pre>
+</div>
+
+<div class="footer">
+Powered by FahTech Installer | Tutorial CRUD Siswa | <a href="/crud/">🔗 Akses CRUD App</a>
+</div>
+</div>
+<script>document.getElementById('ip').innerText = window.location.hostname;</script>
+</body>
+</html>
+HTML
         
-        apt install -y isc-dhcp-server
-        echo "INTERFACESv4=\"$SELECTED_IFACE\"" > /etc/default/isc-dhcp-server
-        cat > /etc/dhcp/dhcpd.conf <<EOF
-subnet $SUBNET netmask 255.255.255.0 {
-    range $RANGE_START $RANGE_END;
-    option routers $GATEWAY;
-    option domain-name-servers 8.8.8.8;
-}
+        chown -R www-data:www-data /var/www/html/crud
+        chown -R www-data:www-data /var/www/html/$DOMAIN
+        
+        cat > /etc/apache2/sites-available/$DOMAIN.conf <<EOF
+<VirtualHost *:80>
+    ServerName $DOMAIN
+    ServerAlias www.$DOMAIN
+    DocumentRoot /var/www/html/$DOMAIN
+    ErrorLog \${APACHE_LOG_DIR}/error.log
+    CustomLog \${APACHE_LOG_DIR}/access.log combined
+</VirtualHost>
 EOF
-        systemctl restart isc-dhcp-server
-        systemctl enable isc-dhcp-server
         
-        echo -e "\n${GREEN}✅ DHCP BERHASIL! Interface: $SELECTED_IFACE${NC}"
-        echo -e "   🌐 Subnet: $SUBNET/24 | Range: $RANGE_START - $RANGE_END"
+        a2ensite $DOMAIN.conf
+        systemctl reload apache2
+        
+        echo -e "\n${GREEN}✅ DNS SERVER 2 BERHASIL!${NC}"
+        echo -e "   🌐 Akses Web: http://$DOMAIN"
+        echo -e "   🗄️ CRUD App: http://$IP/crud/"
+        echo -e "\n${YELLOW}💡 Tambahkan ke file hosts:${NC}"
+        echo -e "   echo '$IP $DOMAIN' >> /etc/hosts"
     fi
     read -p "Tekan Enter..."
 }
 
-# ======================= 4. DNS SERVER (FIXED) =======================
-install_dns() {
+# ======================= INSTALL DNS3 (Tampilan Web - Tutorial Apache2) =======================
+install_dns3() {
     clear
-    echo -e "${BLUE}╔════════════════════════════════════════════════╗${NC}"
-    echo -e "${BLUE}║              🔍 INSTALL DNS SERVER             ║${NC}"
-    echo -e "${BLUE}╚════════════════════════════════════════════════╝${NC}"
+    echo -e "${CYAN}╔══════════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${CYAN}║   🔍 DNS SERVER 3 - TUTORIAL APACHE2 (Tampilan Web Keren)        ║${NC}"
+    echo -e "${CYAN}╚══════════════════════════════════════════════════════════════════╝${NC}"
     
     show_interfaces
-    echo -e "\n${YELLOW}👉 Pilih interface untuk DNS Server:${NC}"
-    read -p "Nomor [1-${#INTERFACES[@]}]: " choice
+    echo -e "\n${YELLOW}👉 Pilih interface untuk DNS Server 3:${NC}"
+    read -p "Nomor: " choice
     
     if [[ $choice -ge 1 && $choice -le ${#INTERFACES[@]} ]]; then
         IFS='|' read -r IFACE IP <<< "${INTERFACES[$((choice-1))]}"
-        
-        echo -e "\n${MAGENTA}📝 Masukkan nama domain (contoh: fahtech.com):${NC}"
+        echo -e "\n${CYAN}📝 Masukkan domain (contoh: web.fahtech.com):${NC}"
         read -p "Domain: " DOMAIN
         
-        # Hapus bind9 lama total
-        systemctl stop bind9 2>/dev/null
-        systemctl disable bind9 2>/dev/null
-        apt remove --purge -y bind9 bind9utils 2>/dev/null
-        rm -rf /etc/bind /var/lib/bind /var/cache/bind
+        apt update -qq
+        apt install -y apache2 php libapache2-mod-php
         
-        # Install fresh
+        clean_dns
         apt install -y bind9 bind9utils
         
-        # Buat folder dan permission
         mkdir -p /etc/bind /var/lib/bind /var/cache/bind
         chown -R bind:bind /var/lib/bind /var/cache/bind
         
-        # Konfigurasi zone
         cat > /etc/bind/named.conf.local <<EOF
 zone "$DOMAIN" {
     type master;
@@ -242,404 +530,132 @@ zone "$DOMAIN" {
 };
 EOF
         
-        # File zone
         cat > /etc/bind/db.$DOMAIN <<EOF
 \$TTL    604800
-@       IN      SOA     ns1.$DOMAIN. admin.$DOMAIN. (
-                  2026011501         ; Serial
-                  604800         ; Refresh
-                  86400         ; Retry
-                  2419200        ; Expire
-                  604800 )       ; Negative Cache TTL
-;
+@       IN      SOA     ns1.$DOMAIN. admin.$DOMAIN. ( 3 604800 86400 2419200 604800 )
 @       IN      NS      ns1.$DOMAIN.
 @       IN      A       $IP
-@       IN      MX 10   mail.$DOMAIN.
 ns1     IN      A       $IP
 www     IN      A       $IP
-mail    IN      A       $IP
 EOF
         
-        # Options dengan forwarder
         cat > /etc/bind/named.conf.options <<EOF
 options {
     directory "/var/cache/bind";
     recursion yes;
     allow-query { any; };
-    forwarders {
-        8.8.8.8;
-        8.8.4.4;
-    };
-    dnssec-validation auto;
+    forwarders { 8.8.8.8; 8.8.4.4; };
     listen-on { any; };
-    listen-on-v6 { none; };
 };
 EOF
         
-        chown bind:bind /etc/bind/db.$DOMAIN
-        chmod 644 /etc/bind/db.$DOMAIN
-        
-        # Start bind9
         systemctl start bind9
         systemctl enable bind9
         
-        # Simpan konfigurasi
-        echo "$DOMAIN" > /etc/maildomain.conf
-        echo "$IP" > /etc/mailip.conf
-        
-        echo -e "\n${GREEN}✅ DNS BERHASIL!${NC}"
-        echo -e "   📝 Domain: $DOMAIN"
-        echo -e "   🌐 IP: $IP"
-        echo -e "   📧 Subdomain: mail.$DOMAIN"
-    fi
-    read -p "Tekan Enter..."
-}
+        # BUAT TAMPILAN WEB UNTUK DNS3 (Tutorial Apache2)
+        mkdir -p /var/www/html/$DOMAIN
+        cat > /var/www/html/$DOMAIN/index.html <<HTML
+<!DOCTYPE html>
+<html>
+<head><title>DNS Server 3 - Tutorial Apache2</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:linear-gradient(135deg,#0f2027,#203a43,#2c5364);font-family:'Segoe UI',Arial;min-height:100vh;padding:40px}
+.container{max-width:1000px;margin:auto;background:white;border-radius:20px;padding:40px;box-shadow:0 20px 60px rgba(0,0,0,0.3)}
+h1{color:#2c5364;border-left:5px solid #2c5364;padding-left:20px}
+.badge{background:#2c5364;color:white;padding:5px 15px;border-radius:20px;display:inline-block;font-size:12px}
+pre{background:#1a1a2e;color:#0f0;padding:20px;border-radius:10px;overflow-x:auto;margin:20px 0}
+.step{background:#e8f4f8;border-left:4px solid #2c5364;padding:15px;margin:15px 0}
+code{background:#f4f4f4;padding:2px 6px;border-radius:4px;color:#e83e8c}
+.footer{text-align:center;margin-top:40px;padding-top:20px;border-top:1px solid #ddd;color:#888}
+</style>
+</head>
+<body>
+<div class="container">
+<div class="badge">🌍 DNS SERVER 3</div>
+<h1>📖 Tutorial Apache2 Web Server</h1>
+<p>Panduan lengkap konfigurasi Apache2 Web Server di Debian/Ubuntu</p>
 
-# ======================= 5. MAIL SERVER =======================
-install_mail() {
-    clear
-    echo -e "${BLUE}╔════════════════════════════════════════════════╗${NC}"
-    echo -e "${BLUE}║              📧 INSTALL MAIL SERVER            ║${NC}"
-    echo -e "${BLUE}╚════════════════════════════════════════════════╝${NC}"
-    
-    if [[ ! -f /etc/maildomain.conf ]]; then
-        echo -e "\n${RED}❌ DNS belum diinstall! Install DNS dulu (Menu 4).${NC}"
-        read -p "Tekan Enter..."
-        return
-    fi
-    
-    MAIN_DOMAIN=$(cat /etc/maildomain.conf)
-    DNS_IP=$(cat /etc/mailip.conf)
-    
-    echo -e "\n${GREEN}✅ Domain terdeteksi: $MAIN_DOMAIN (IP: $DNS_IP)${NC}"
-    
-    echo -e "\n${CYAN}📝 Buat akun email:${NC}"
-    read -p "Username (contoh: admin): " EMAIL_USER
-    EMAIL_USER=${EMAIL_USER:-admin}
-    read -s -p "Password: " EMAIL_PASS
-    echo ""
-    EMAIL_PASS=${EMAIL_PASS:-admin123}
-    
-    MAIL_DOMAIN="mail.$MAIN_DOMAIN"
-    hostnamectl set-hostname $MAIL_DOMAIN
-    echo "$DNS_IP $MAIL_DOMAIN" >> /etc/hosts
-    
-    apt install -y postfix dovecot-core dovecot-imapd dovecot-pop3d mailutils
-    
-    postconf -e "myhostname = $MAIL_DOMAIN"
-    postconf -e "mydomain = $MAIN_DOMAIN"
-    postconf -e "myorigin = \$mydomain"
-    postconf -e "inet_interfaces = all"
-    postconf -e "home_mailbox = Maildir/"
-    postconf -e "smtpd_sasl_type = dovecot"
-    postconf -e "smtpd_sasl_path = private/auth"
-    postconf -e "smtpd_sasl_auth_enable = yes"
-    
-    rm -rf /etc/dovecot 2>/dev/null
-    cat > /etc/dovecot/dovecot.conf <<EOF
-disable_plaintext_auth = no
-mail_privileged_group = mail
-mail_location = maildir:~/Maildir
-passdb { driver = passwd-file args = scheme=PLAIN /etc/dovecot/users }
-userdb { driver = passwd }
-protocols = imap pop3
-service auth { unix_listener /var/spool/postfix/private/auth { mode = 0660 user = postfix group = postfix } }
-ssl = no
+<div class="step">
+<h3>📌 LANGKAH 1: Install Apache2</h3>
+<pre><code>sudo apt update
+sudo apt install apache2 -y</code></pre>
+</div>
+
+<div class="step">
+<h3>📌 LANGKAH 2: Cek Status Apache2</h3>
+<pre><code>sudo systemctl status apache2
+sudo systemctl enable apache2</code></pre>
+</div>
+
+<div class="step">
+<h3>📌 LANGKAH 3: Konfigurasi Virtual Host</h3>
+<pre><code>sudo nano /etc/apache2/sites-available/domain.conf
+
+&lt;VirtualHost *:80&gt;
+    ServerName domain.com
+    ServerAlias www.domain.com
+    DocumentRoot /var/www/html/domain
+&lt;/VirtualHost&gt;</code></pre>
+</div>
+
+<div class="step">
+<h3>📌 LANGKAH 4: Aktifkan Site</h3>
+<pre><code>sudo a2ensite domain.conf
+sudo a2dissite 000-default.conf
+sudo systemctl reload apache2</code></pre>
+</div>
+
+<div class="step">
+<h3>📌 LANGKAH 5: Buat File Index</h3>
+<pre><code>sudo mkdir -p /var/www/html/domain
+sudo nano /var/www/html/domain/index.html</code></pre>
+</div>
+
+<div class="step">
+<h3>📌 LANGKAH 6: Install PHP (Opsional)</h3>
+<pre><code>sudo apt install php libapache2-mod-php -y
+sudo systemctl restart apache2</code></pre>
+</div>
+
+<div class="step">
+<h3>📌 LANGKAH 7: Aktifkan Modul SSL (HTTPS)</h3>
+<pre><code>sudo a2enmod ssl rewrite
+sudo systemctl restart apache2</code></pre>
+</div>
+
+<div class="step">
+<h3>📌 LANGKAH 8: Cek Log Apache</h3>
+<pre><code>sudo tail -f /var/log/apache2/access.log
+sudo tail -f /var/log/apache2/error.log</code></pre>
+</div>
+
+<div class="footer">
+Powered by FahTech Installer | Tutorial Apache2 Web Server
+</div>
+</div>
+</body>
+</html>
+HTML
+        
+        cat > /etc/apache2/sites-available/$DOMAIN.conf <<EOF
+<VirtualHost *:80>
+    ServerName $DOMAIN
+    ServerAlias www.$DOMAIN
+    DocumentRoot /var/www/html/$DOMAIN
+    ErrorLog \${APACHE_LOG_DIR}/error.log
+    CustomLog \${APACHE_LOG_DIR}/access.log combined
+</VirtualHost>
 EOF
-    
-    mkdir -p /etc/dovecot
-    echo "$EMAIL_USER@$MAIN_DOMAIN:$EMAIL_PASS" > /etc/dovecot/users
-    chmod 600 /etc/dovecot/users
-    useradd -m -s /bin/false $EMAIL_USER 2>/dev/null
-    echo "$EMAIL_USER:$EMAIL_PASS" | chpasswd
-    mkdir -p /home/$EMAIL_USER/Maildir/{cur,new,tmp}
-    chown -R $EMAIL_USER:$EMAIL_USER /home/$EMAIL_USER/Maildir
-    
-    systemctl restart postfix dovecot
-    systemctl enable postfix dovecot
-    
-    echo "$EMAIL_USER" > /etc/mailuser.conf
-    echo "$EMAIL_PASS" > /etc/mailpass.conf
-    
-    echo -e "\n${GREEN}✅ MAIL SERVER BERHASIL!${NC}"
-    echo -e "   📧 Email: $EMAIL_USER@$MAIN_DOMAIN"
-    echo -e "   🔑 Password: $EMAIL_PASS"
-    read -p "Tekan Enter..."
-}
-
-# ======================= 6. WEBMAIL =======================
-install_webmail() {
-    clear
-    echo -e "${GREEN}╔════════════════════════════════════════════════╗${NC}"
-    echo -e "${GREEN}║         🌐 INSTALL WEBMAIL (ROUNDCUBE)         ║${NC}"
-    echo -e "${GREEN}╚════════════════════════════════════════════════╝${NC}"
-    
-    if [[ ! -f /etc/maildomain.conf ]]; then
-        echo -e "\n${RED}❌ Mail Server belum diinstall! Install dulu (Menu 5).${NC}"
-        read -p "Tekan Enter..."
-        return
-    fi
-    
-    MAIN_DOMAIN=$(cat /etc/maildomain.conf)
-    DNS_IP=$(cat /etc/mailip.conf)
-    EMAIL_USER=$(cat /etc/mailuser.conf 2>/dev/null)
-    EMAIL_PASS=$(cat /etc/mailpass.conf 2>/dev/null)
-    
-    apt remove --purge -y roundcube* php-roundcube* dbconfig-common 2>/dev/null
-    rm -rf /etc/roundcube /var/lib/roundcube /usr/share/roundcube
-    apt install -y roundcube roundcube-mysql roundcube-core php-mysql
-    
-    DB_PASS="rcube123"
-    mysql -u root <<MYSQL 2>/dev/null
-DROP DATABASE IF EXISTS roundcubemail;
-CREATE DATABASE roundcubemail;
-CREATE USER IF NOT EXISTS 'roundcube'@'localhost' IDENTIFIED BY '$DB_PASS';
-GRANT ALL PRIVILEGES ON roundcubemail.* TO 'roundcube'@'localhost';
-FLUSH PRIVILEGES;
-MYSQL
-    
-    if [ -f /usr/share/roundcube/SQL/mysql.initial.sql ]; then
-        mysql roundcubemail < /usr/share/roundcube/SQL/mysql.initial.sql 2>/dev/null
-    fi
-    
-    cat > /etc/roundcube/config.inc.php <<PHP
-<?php \$config = []; \$config['db_dsnw'] = 'mysql://roundcube:rcube123@localhost/roundcubemail'; \$config['default_host'] = 'localhost'; \$config['smtp_server'] = 'localhost'; \$config['smtp_port'] = 25; \$config['smtp_user'] = '%u'; \$config['smtp_pass'] = '%p'; \$config['product_name'] = 'FahTech Webmail - $MAIN_DOMAIN'; \$config['plugins'] = ['archive', 'zipdownload']; \$config['skin'] = 'elastic';
-PHP
-    
-    cat > /etc/apache2/conf-available/roundcube.conf <<APACHE
-Alias /roundcube /usr/share/roundcube
-<Directory /usr/share/roundcube/> Options +FollowSymLinks AllowOverride All Require all granted </Directory>
-APACHE
-    
-    a2enconf roundcube
-    a2enmod rewrite
-    systemctl restart apache2 postfix dovecot
-    
-    echo -e "\n${GREEN}✅ WEBMAIL BERHASIL!${NC}"
-    echo -e "   🌐 Akses: http://$DNS_IP/roundcube/"
-    echo -e "   📧 Login: $EMAIL_USER@$MAIN_DOMAIN / $EMAIL_PASS"
-    read -p "Tekan Enter..."
-}
-
-# ======================= 7. FTP =======================
-install_ftp() {
-    clear
-    echo -e "${GREEN}╔════════════════════════════════════════════════╗${NC}"
-    echo -e "${GREEN}║              📁 INSTALL FTP SERVER             ║${NC}"
-    echo -e "${GREEN}╚════════════════════════════════════════════════╝${NC}"
-    
-    apt install -y vsftpd
-    systemctl restart vsftpd
-    systemctl enable vsftpd
-    
-    echo -e "\n${GREEN}✅ FTP BERHASIL! Akses: ftp://$SERVER_IP${NC}"
-    read -p "Tekan Enter..."
-}
-
-# ======================= 8. SAMBA =======================
-install_samba() {
-    clear
-    echo -e "${GREEN}╔════════════════════════════════════════════════╗${NC}"
-    echo -e "${GREEN}║              🖥️ INSTALL SAMBA                  ║${NC}"
-    echo -e "${GREEN}╚════════════════════════════════════════════════╝${NC}"
-    
-    read -p "📝 Nama Share (Enter untuk 'public'): " share_name
-    share_name=${share_name:-public}
-    
-    apt install -y samba
-    mkdir -p /home/share
-    chmod 777 /home/share
-    
-    cat >> /etc/samba/smb.conf <<EOF
-[$share_name]
-   path = /home/share
-   browseable = yes
-   writable = yes
-   guest ok = yes
-   create mask = 0777
-EOF
-    
-    systemctl restart smbd
-    systemctl enable smbd
-    
-    echo -e "\n${GREEN}✅ SAMBA BERHASIL! Akses: \\\\$SERVER_IP\\$share_name${NC}"
-    read -p "Tekan Enter..."
-}
-
-# ======================= 9. WORDPRESS =======================
-install_wordpress() {
-    clear
-    echo -e "${GREEN}╔════════════════════════════════════════════════╗${NC}"
-    echo -e "${GREEN}║              📝 INSTALL WORDPRESS              ║${NC}"
-    echo -e "${GREEN}╚════════════════════════════════════════════════╝${NC}"
-    
-    apt install -y mariadb-server
-    systemctl restart mariadb
-    
-    DB_PASS=$(openssl rand -base64 12 | tr -d "=/+" | cut -c1-16)
-    
-    mysql -u root <<MYSQL_SCRIPT 2>/dev/null
-CREATE DATABASE IF NOT EXISTS wordpress;
-CREATE USER IF NOT EXISTS 'wpuser'@'localhost' IDENTIFIED BY '$DB_PASS';
-GRANT ALL PRIVILEGES ON wordpress.* TO 'wpuser'@'localhost';
-FLUSH PRIVILEGES;
-MYSQL_SCRIPT
-    
-    cd /tmp
-    wget -q https://wordpress.org/latest.tar.gz
-    tar -xzf latest.tar.gz
-    cp -r wordpress/* /var/www/html/
-    cp /var/www/html/wp-config-sample.php /var/www/html/wp-config.php
-    
-    sed -i "s/database_name_here/wordpress/" /var/www/html/wp-config.php
-    sed -i "s/username_here/wpuser/" /var/www/html/wp-config.php
-    sed -i "s/password_here/$DB_PASS/" /var/www/html/wp-config.php
-    
-    chown -R www-data:www-data /var/www/html/
-    systemctl restart apache2
-    
-    echo -e "\n${GREEN}✅ WORDPRESS BERHASIL! Akses: http://$SERVER_IP/wp-admin/install.php${NC}"
-    echo -e "${YELLOW}   🔑 DB Password: $DB_PASS${NC}"
-    read -p "Tekan Enter..."
-}
-
-# ======================= 10. TAMBAH USER EMAIL =======================
-add_mail_user() {
-    clear
-    echo -e "${GREEN}╔════════════════════════════════════════════════╗${NC}"
-    echo -e "${GREEN}║              👤 TAMBAH USER EMAIL              ║${NC}"
-    echo -e "${GREEN}╚════════════════════════════════════════════════╝${NC}"
-    
-    if [[ ! -f /etc/maildomain.conf ]]; then
-        echo -e "\n${RED}❌ Mail Server belum diinstall!${NC}"
-        read -p "Tekan Enter..."
-        return
-    fi
-    
-    MAIN_DOMAIN=$(cat /etc/maildomain.conf)
-    DNS_IP=$(cat /etc/mailip.conf)
-    
-    echo -e "\n${YELLOW}📝 Masukkan username baru:${NC}"
-    read -p "Username: " NEW_USER
-    read -s -p "Password: " NEW_PASS
-    echo ""
-    NEW_PASS=${NEW_PASS:-12345}
-    
-    echo "$NEW_USER@$MAIN_DOMAIN:$NEW_PASS" >> /etc/dovecot/users
-    useradd -m -s /bin/false $NEW_USER 2>/dev/null
-    echo "$NEW_USER:$NEW_PASS" | chpasswd
-    mkdir -p /home/$NEW_USER/Maildir/{cur,new,tmp}
-    chown -R $NEW_USER:$NEW_USER /home/$NEW_USER/Maildir
-    systemctl restart dovecot
-    
-    echo -e "\n${GREEN}✅ User $NEW_USER@$MAIN_DOMAIN berhasil ditambahkan!${NC}"
-    read -p "Tekan Enter..."
-}
-
-# ======================= 11. INSTALL SEMUA =======================
-install_all() {
-    clear
-    echo -e "${GREEN}╔════════════════════════════════════════════════╗${NC}"
-    echo -e "${GREEN}║         ⚡ INSTALL SEMUA SERVICE LENGKAP       ║${NC}"
-    echo -e "${GREEN}╚════════════════════════════════════════════════╝${NC}"
-    
-    echo -e "\n${YELLOW}⚠️ Proses akan memakan waktu 20-30 menit. Lanjutkan? (y/n):${NC}"
-    read confirm
-    if [[ "$confirm" == "y" ]]; then
-        install_apache2
-        install_dhcp
-        install_dns
-        install_ftp
-        install_samba
-        install_wordpress
-        install_crud
-        install_mail
-        install_webmail
         
-        MAIN_DOMAIN=$(cat /etc/maildomain.conf 2>/dev/null)
-        DNS_IP=$(cat /etc/mailip.conf 2>/dev/null)
-        EMAIL_USER=$(cat /etc/mailuser.conf 2>/dev/null)
-        EMAIL_PASS=$(cat /etc/mailpass.conf 2>/dev/null)
+        a2ensite $DOMAIN.conf
+        systemctl reload apache2
         
-        echo -e "\n${GREEN}════════════════════════════════════════════════════════════════════╗${NC}"
-        echo -e "${GREEN}   🎉 SEMUA SERVICE BERHASIL DIINSTALL! 🎉                            ║${NC}"
-        echo -e "${GREEN}════════════════════════════════════════════════════════════════════║${NC}"
-        echo -e "${GREEN}                                                                     ║${NC}"
-        echo -e "${GREEN}   🌐 LANDING PAGE:  http://$DNS_IP                                  ║${NC}"
-        echo -e "${GREEN}   📚 CRUD:          http://$DNS_IP/crud/                           ║${NC}"
-        echo -e "${GREEN}   📧 WEBMAIL:       http://$DNS_IP/roundcube/                      ║${NC}"
-        echo -e "${GREEN}   📝 WORDPRESS:     http://$DNS_IP/wp-admin                        ║${NC}"
-        echo -e "${GREEN}   📁 FTP:           ftp://$DNS_IP                                  ║${NC}"
-        echo -e "${GREEN}   🖥️ SAMBA:         \\\\$DNS_IP\\public                              ║${NC}"
-        echo -e "${GREEN}                                                                     ║${NC}"
-        echo -e "${GREEN}   📧 LOGIN WEBMAIL: $EMAIL_USER@$MAIN_DOMAIN / $EMAIL_PASS        ║${NC}"
-        echo -e "${GREEN}                                                                     ║${NC}"
-        echo -e "${GREEN}════════════════════════════════════════════════════════════════════╝${NC}"
+        echo -e "\n${GREEN}✅ DNS SERVER 3 BERHASIL!${NC}"
+        echo -e "   🌐 Akses Web: http://$DOMAIN"
+        echo -e "\n${YELLOW}💡 Tambahkan ke file hosts:${NC}"
+        echo -e "   echo '$IP $DOMAIN' >> /etc/hosts"
     fi
-    read -p "Tekan Enter..."
-}
-
-# ======================= 12. HAPUS SEMUA =======================
-uninstall_all() {
-    clear
-    echo -e "${RED}╔════════════════════════════════════════════════╗${NC}"
-    echo -e "${RED}║              🗑️ HAPUS SEMUA SERVICE            ║${NC}"
-    echo -e "${RED}╚════════════════════════════════════════════════╝${NC}"
-    
-    echo -e "\n${YELLOW}⚠️ Yakin akan menghapus SEMUA service? (y/n):${NC}"
-    read confirm
-    if [[ "$confirm" == "y" ]]; then
-        systemctl stop apache2 bind9 isc-dhcp-server postfix dovecot samba smbd vsftpd mariadb 2>/dev/null
-        apt remove --purge -y apache2* bind9* isc-dhcp-server* postfix* dovecot* samba* vsftpd* mariadb* mysql* roundcube* 2>/dev/null
-        rm -rf /etc/apache2 /etc/bind /etc/dhcp /etc/postfix /etc/dovecot /etc/samba /var/www/html /var/lib/mysql
-        rm -rf /etc/roundcube /var/lib/roundcube /usr/share/roundcube /home/share /home/*/Maildir
-        rm -rf /etc/maildomain.conf /etc/mailip.conf /etc/mailuser.conf /etc/mailpass.conf
-        apt autoremove --purge -y
-        echo -e "\n${GREEN}✅ SEMUA SERVICE DAN FOLDER BERHASIL DIHAPUS!${NC}"
-    fi
-    read -p "Tekan Enter..."
-}
-
-# ======================= 13. CEK STATUS =======================
-check_status() {
-    clear
-    echo -e "${CYAN}╔════════════════════════════════════════════════╗${NC}"
-    echo -e "${CYAN}║              📊 CEK STATUS SERVICE             ║${NC}"
-    echo -e "${CYAN}╚════════════════════════════════════════════════╝${NC}"
-    
-    echo -e "\n${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    
-    for service in apache2 bind9 isc-dhcp-server vsftpd smbd postfix dovecot mariadb; do
-        name=""
-        case $service in
-            apache2) name="🌍 Apache2";;
-            bind9) name="🔍 DNS Server";;
-            isc-dhcp-server) name="🌐 DHCP Server";;
-            vsftpd) name="📁 FTP Server";;
-            smbd) name="🖥️ Samba";;
-            postfix) name="📧 Postfix (Mail)";;
-            dovecot) name="📧 Dovecot (IMAP)";;
-            mariadb) name="🗄️ MariaDB";;
-        esac
-        if systemctl is-active --quiet $service; then
-            echo -e "  $name | ${GREEN}✅ ACTIVE${NC}"
-        else
-            echo -e "  $name | ${RED}❌ INACTIVE${NC}"
-        fi
-    done
-    
-    echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    
-    if [[ -f /etc/maildomain.conf ]]; then
-        MAIN_DOMAIN=$(cat /etc/maildomain.conf)
-        DNS_IP=$(cat /etc/mailip.conf)
-        EMAIL_USER=$(cat /etc/mailuser.conf 2>/dev/null)
-        echo -e "\n📧 MAIL SERVER INFO:"
-        echo -e "   📝 Domain: $MAIN_DOMAIN"
-        echo -e "   📧 Email: $EMAIL_USER@$MAIN_DOMAIN"
-        echo -e "   🌐 Webmail: http://$DNS_IP/roundcube/"
-    fi
-    
     read -p "Tekan Enter..."
 }
 
@@ -647,45 +663,26 @@ check_status() {
 while true; do
     clear
     echo -e "${CYAN}"
-    echo "╔════════════════════════════════════════════════════════════════════════════╗"
-    echo "║            🚀 FAHTECH MULTI-SERVICE INSTALLER v21.0                        ║"
-    echo "║                    SEMUA SERVICE PASTI BERHASIL                            ║"
-    echo "╠════════════════════════════════════════════════════════════════════════════╣"
-    echo "║                                                                             ║"
-    echo "║  1.  ⚡ INSTALL SEMUA SERVICE (20-30 menit) - REKOMENDED                    ║"
-    echo "║  2.  🌍 Install Apache2 + Landing Page                                     ║"
-    echo "║  3.  🗄️ Install CRUD Siswa (Tambah/Edit/Hapus/Cari)                        ║"
-    echo "║  4.  🌐 Install DHCP Server                                                ║"
-    echo "║  5.  🔍 Install DNS Server                                                 ║"
-    echo "║  6.  📧 Install Mail Server (Postfix + Dovecot)                            ║"
-    echo "║  7.  🌐 Install Webmail (Roundcube) - Akses Email via Browser              ║"
-    echo "║  8.  👤 Tambah User Email Baru                                             ║"
-    echo "║  9.  📁 Install FTP Server                                                 ║"
-    echo "║  10. 🖥️ Install Samba                                                      ║"
-    echo "║  11. 📝 Install WordPress                                                  ║"
-    echo "║  12. 🗑️ Hapus SEMUA Service + Folder                                       ║"
-    echo "║  13. 📊 Cek Status Service                                                 ║"
-    echo "║  14. 🚪 Exit                                                               ║"
-    echo "╚════════════════════════════════════════════════════════════════════════════╝"
+    echo "╔══════════════════════════════════════════════════════════════════╗"
+    echo "║       🚀 FAHTECH - 3 DNS SERVER dengan 3 TAMPILAN WEB           ║"
+    echo "║         DNS1: Tutorial DHCP | DNS2: Tutorial CRUD               ║"
+    echo "║               DNS3: Tutorial Apache2                            ║"
+    echo "╠══════════════════════════════════════════════════════════════════╣"
+    echo "║                                                                  ║"
+    echo "║  1.  🔍 Install DNS Server 1 (Tutorial DHCP - Tampilan Web)      ║"
+    echo "║  2.  🗄️ Install DNS Server 2 (Tutorial CRUD - Tampilan Web)      ║"
+    echo "║  3.  🌍 Install DNS Server 3 (Tutorial Apache2 - Tampilan Web)   ║"
+    echo "║  4.  🚪 Exit                                                     ║"
+    echo "╚══════════════════════════════════════════════════════════════════╝"
     echo -e "${NC}"
     
-    read -p "👉 Pilih menu [1-14]: " menu
+    read -p "👉 Pilih menu [1-4]: " menu
     
     case $menu in
-        1) install_all ;;
-        2) install_apache2 ;;
-        3) install_crud ;;
-        4) install_dhcp ;;
-        5) install_dns ;;
-        6) install_mail ;;
-        7) install_webmail ;;
-        8) add_mail_user ;;
-        9) install_ftp ;;
-        10) install_samba ;;
-        11) install_wordpress ;;
-        12) uninstall_all ;;
-        13) check_status ;;
-        14) 
+        1) install_dns1 ;;
+        2) install_dns2 ;;
+        3) install_dns3 ;;
+        4) 
             echo -e "${GREEN}👋 Terima kasih!${NC}"
             exit 0
             ;;
